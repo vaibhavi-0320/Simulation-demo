@@ -1,15 +1,13 @@
-import cors from "cors";
 import dotenv from "dotenv";
-import express from "express";
+import express, { NextFunction, Request, Response } from "express";
 import http from "http";
 import net from "net";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import { askAssistant, createInvoice, fundInvoice, jsonError, listInvoices, listTransactions, listVisitors, parseInvoice, repayInvoice, trackVisitor } from "./backend/service";
 
 dotenv.config();
 
-const DEFAULT_PORT = 4517;
+const DEFAULT_PORT = 5173;
 
 async function resolveAvailablePort(startPort: number): Promise<number> {
   const tryPort = (port: number) =>
@@ -37,84 +35,195 @@ async function resolveAvailablePort(startPort: number): Promise<number> {
 }
 
 async function startServer() {
+  const [auth, env, errors, horizon, rateLimit, security, service, validation] = await Promise.all([
+    import("../backend/auth.ts"),
+    import("../backend/env.ts"),
+    import("../backend/errors.ts"),
+    import("../backend/horizon.ts"),
+    import("../backend/rateLimit.ts"),
+    import("../backend/security.ts"),
+    import("../backend/service.ts"),
+    import("../backend/validation.ts"),
+  ]);
+  const { logger } = await import("../backend/logger.ts");
+
+  env.assertEnvReady();
   const app = express();
   const preferredPort = Number(process.env.PORT || process.env.APP_PORT || DEFAULT_PORT);
   const resolvedPort = await resolveAvailablePort(preferredPort);
   const httpServer = http.createServer(app);
 
-  app.use(cors());
+  security.configureSecurity(app);
   app.use(express.json({ limit: "10mb" }));
 
-  app.get("/api/health", (_req, res) => res.json({ status: "ok", service: "stellar99-api", port: resolvedPort }));
-  app.get("/api/invoices", (_req, res) => res.json(listInvoices()));
-  app.get("/api/transactions", (_req, res) => res.json(listTransactions()));
-  app.get("/api/visitors", (_req, res) => res.json(listVisitors()));
+  // Rate limiting on all /api routes
+  app.use("/api", rateLimit.rateLimitMiddleware("default"));
 
-  app.post("/api/invoices", (req, res) => {
+  // Wallet Authentication Endpoints (public, no auth required)
+  const walletAuth = await import("../backend/wallet-auth.ts");
+  
+  app.post("/api/auth/challenge", async (req, res, next) => {
     try {
-      res.status(201).json(createInvoice(req.body));
+      const body = validation.addressSchema.parse(req.body);
+      const result = await walletAuth.createChallenge(body.address);
+      res.json(result);
     } catch (error) {
-      res.status(400).json(jsonError(error));
+      next(error);
     }
   });
 
-  app.post("/api/invoice-action", (req, res) => {
+  app.post("/api/auth/verify", async (req, res, next) => {
     try {
-      if (req.query.action === "fund") {
-        res.json(fundInvoice(String(req.query.id || ""), req.body?.funder || "UNKNOWN"));
+      const body = validation.signatureSchema.parse(req.body);
+      const result = await walletAuth.verifySignature(body.address, body.signature, body.nonce);
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Require Clerk auth for the rest of /api routes
+  app.use("/api", auth.requireAuthJson);
+
+  app.get("/api/health", (_req, res) => res.json({ success: true, data: { status: "ok", service: "fintrix-api", port: resolvedPort } }));
+  app.get("/api/invoices", async (req, res, next) => {
+    try {
+      const result = await service.listInvoices(auth.getAuthContext(req));
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  });
+  app.get("/api/invoice/all", async (req, res, next) => {
+    try {
+      const result = await service.listInvoices(auth.getAuthContext(req));
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  });
+  app.get("/api/transactions", async (req, res, next) => {
+    try {
+      const result = await service.listTransactions(auth.getAuthContext(req));
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  });
+  app.get("/api/visitors", async (req, res, next) => {
+    try {
+      const result = await service.listVisitors(auth.getAuthContext(req));
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/invoices", async (req, res, next) => {
+    try {
+      const body = validation.invoiceCreateSchema.parse(req.body) as Parameters<typeof service.createInvoice>[1];
+      const result = await service.createInvoice(auth.getAuthContext(req), body);
+      res.status(201).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/invoice/upload", async (req, res, next) => {
+    try {
+      const body = validation.invoiceCreateSchema.parse(req.body) as Parameters<typeof service.createInvoice>[1];
+      const preview = {
+        id: body.number || `INV-${Date.now()}`,
+        buyer: body.buyer,
+        amount: body.amount,
+        discount: body.discount,
+        due: body.due,
+        seller: body.seller,
+        notes: body.notes || "Invoice ready for listing.",
+      };
+      logger.info({ invoiceId: preview.id, buyer: preview.buyer }, "invoice upload accepted");
+      res.status(201).json({ success: true, data: preview });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/invoice/list", async (req, res, next) => {
+    try {
+      const body = validation.invoiceCreateSchema.parse(req.body) as Parameters<typeof service.createInvoice>[1];
+      const result = await service.createInvoice(auth.getAuthContext(req), body);
+      res.status(201).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/invoice-action", async (req, res, next) => {
+    try {
+      const query = validation.invoiceActionQuerySchema.parse(req.query);
+      if (query.action === "fund") {
+        const body = validation.fundInvoiceSchema.parse(req.body);
+        const result = await service.fundInvoice(auth.getAuthContext(req), query.id, body.funder, body.amount);
+        res.json({ success: true, data: result });
         return;
       }
-      if (req.query.action === "repay") {
-        res.json(repayInvoice(String(req.query.id || "")));
+      if (query.action === "repay") {
+        validation.emptyBodySchema.parse(req.body || {});
+        const result = await service.repayInvoice(auth.getAuthContext(req), query.id);
+        res.json({ success: true, data: result });
         return;
       }
-      res.status(400).json({ error: "Unknown action." });
+      res.status(400).json({ success: false, error: "Unknown action." });
     } catch (error) {
-      res.status(400).json(jsonError(error));
+      next(error);
     }
   });
 
-  app.post("/api/ai-parse", async (req, res) => {
+  app.post("/api/invoice/fund", async (req, res, next) => {
     try {
-      res.json(await parseInvoice(req.body?.fileBase64 || "", req.body?.mimeType || "application/octet-stream"));
+      const body = validation.fundInvoiceSchema.extend({ id: validation.invoiceActionQuerySchema.shape.id }).parse(req.body);
+      const result = await service.fundInvoice(auth.getAuthContext(req), body.id, body.funder, body.amount);
+      res.json({ success: true, data: result });
     } catch (error) {
-      res.status(500).json(jsonError(error));
+      next(error);
     }
   });
 
-  app.post("/api/chat", async (req, res) => {
+  app.post("/api/ai-parse", async (req, res, next) => {
     try {
-      res.json(await askAssistant({
-        question: String(req.body?.question || ""),
-        walletAddress: req.body?.walletAddress,
-        view: req.body?.view,
-      }));
+      const body = validation.parseInvoiceSchema.parse(req.body);
+      res.json({ success: true, data: await service.parseInvoice(body.fileBase64, body.mimeType) });
     } catch (error) {
-      res.status(500).json(jsonError(error));
+      next(error);
     }
   });
 
-  app.post("/api/track-visitor", (req, res) => {
+  app.post("/api/chat", async (req, res, next) => {
     try {
-      const visitor = trackVisitor({
-        id: String(req.body?.id || ""),
-        userAgent: String(req.body?.userAgent || req.headers["user-agent"] || ""),
-        language: String(req.body?.language || req.headers["accept-language"] || ""),
-        platform: String(req.body?.platform || ""),
+      res.json({ success: true, data: await service.askAssistant(validation.chatSchema.parse(req.body) as Parameters<typeof service.askAssistant>[0]) });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/track-visitor", async (req, res, next) => {
+    try {
+      const body = validation.visitorSchema.parse({
+        ...req.body,
+        userAgent: req.body?.userAgent || req.headers["user-agent"],
+        language: req.body?.language || req.headers["accept-language"],
       });
-      res.status(201).json(visitor);
+      const visitor = await service.trackVisitor(auth.getAuthContext(req), body);
+      res.status(201).json({ success: true, data: visitor });
     } catch (error) {
-      res.status(400).json(jsonError(error));
+      next(error);
     }
   });
 
   if (process.env.NODE_ENV !== "production") {
+    // Dev mode: integrate Vite as middleware for full HMR + React app
     const vite = await createViteServer({
-      root: process.cwd(),
-      server: {
-        middlewareMode: { server: httpServer },
-        hmr: { server: httpServer, port: resolvedPort, host: "127.0.0.1" },
-      },
+      server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
@@ -124,11 +233,20 @@ async function startServer() {
     app.get("*", (_req, res) => res.sendFile(path.join(distPath, "index.html")));
   }
 
+  app.use((error: unknown, req: Request, res: Response, next: NextFunction) => errors.errorHandler(error, req, res, next));
+
   httpServer.listen(resolvedPort, "127.0.0.1", () => {
-    console.log(`stellar99 dev server running on http://127.0.0.1:${resolvedPort}`);
+    const actualPort = (httpServer.address() as any)?.port || resolvedPort;
+    console.log(`fintrix dev server running on http://127.0.0.1:${actualPort}`);
+    
+    // Start Horizon listener for contract events
+    const contractAddress = env.getEnv().SOROBAN_CONTRACT_ADDRESS;
+    if (contractAddress) {
+      horizon.startHorizonListener(contractAddress);
+    } else {
+      console.warn("SOROBAN_CONTRACT_ADDRESS not set, Horizon listener not started");
+    }
   });
 }
 
 void startServer();
-
-

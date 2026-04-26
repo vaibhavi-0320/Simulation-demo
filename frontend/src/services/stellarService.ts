@@ -95,8 +95,10 @@ export async function getNetworkSummary() {
   }
 }
 
-export async function getInvoices() {
-  return readJson<Invoice[]>(await fetch("/api/invoices"));
+export async function getInvoices(): Promise<Invoice[]> {
+  const res = await readJson<{ success: boolean; data: Invoice[] } | Invoice[]>(await fetch("/api/invoices"));
+  const arr = Array.isArray(res) ? res : (res as { data: Invoice[] }).data;
+  return Array.isArray(arr) ? arr : [];
 }
 
 export async function createInvoice(payload: {
@@ -107,37 +109,42 @@ export async function createInvoice(payload: {
   discount: number;
   seller: string;
   notes?: string;
-}) {
-  return readJson<Invoice>(
+}): Promise<Invoice> {
+  const res = await readJson<{ success: boolean; data: Invoice } | Invoice>(
     await fetch("/api/invoices", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     }),
   );
+  return (res as { data: Invoice }).data ?? (res as Invoice);
 }
 
-export async function fundInvoiceOnBackend(invoiceId: string, funder: string, provider: WalletProvider) {
-  return readJson<Invoice>(
+export async function fundInvoiceOnBackend(invoiceId: string, funder: string, provider: WalletProvider): Promise<Invoice> {
+  const res = await readJson<{ success: boolean; data: Invoice } | Invoice>(
     await fetch(`/api/invoice-action?id=${encodeURIComponent(invoiceId)}&action=fund`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ funder, provider }),
     }),
   );
+  return (res as { data: Invoice }).data ?? (res as Invoice);
 }
 
-export async function repayInvoiceOnBackend(invoiceId: string) {
-  return readJson<Invoice>(
+export async function repayInvoiceOnBackend(invoiceId: string): Promise<Invoice> {
+  const res = await readJson<{ success: boolean; data: Invoice } | Invoice>(
     await fetch(`/api/invoice-action?id=${encodeURIComponent(invoiceId)}&action=repay`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
     }),
   );
+  return (res as { data: Invoice }).data ?? (res as Invoice);
 }
 
-export async function getTransactions() {
-  return readJson<Transaction[]>(await fetch("/api/transactions"));
+export async function getTransactions(): Promise<Transaction[]> {
+  const res = await readJson<{ success: boolean; data: Transaction[] } | Transaction[]>(await fetch("/api/transactions"));
+  const arr = Array.isArray(res) ? res : (res as { data: Transaction[] }).data;
+  return Array.isArray(arr) ? arr : [];
 }
 
 export async function buildSorobanEscrowPreview(invoiceId: string, amount: number) {

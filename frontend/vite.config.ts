@@ -5,13 +5,30 @@ import { defineConfig } from "vite";
 const projectRoot = path.resolve(process.cwd());
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react({
+    jsxRuntime: 'automatic',
+  })],
   resolve: {
     alias: {
       "@": projectRoot,
     },
   },
   server: {
-    hmr: process.env.DISABLE_HMR !== "true",
+    middlewareMode: false,
+    hmr: {
+      protocol: 'ws',
+      host: '127.0.0.1',
+      port: 5173,
+    },
+    port: 5173,
+    host: '127.0.0.1',
+  },
+  build: {
+    outDir: 'dist',
+    sourcemap: true,
+    minify: 'terser',
+  },
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react-markdown', 'lucide-react', 'motion/react'],
   },
 });

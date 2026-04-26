@@ -1,4 +1,6 @@
-import React, { useEffect, useMemo, useState, Component } from "react";
+import React, { useEffect, useMemo, useState, Component, useRef } from "react";
+import { LoadingScreen } from "./components/LoadingScreen";
+import Web3HeroLanding from "./components/Web3HeroLanding";
 import { AnimatePresence, motion, useMotionValue, useMotionTemplate } from "motion/react";
 import { Activity, ArrowRight, BriefcaseBusiness, ChartNoAxesCombined, ChevronDown, ChevronRight, Clock3, FileSpreadsheet, LayoutGrid, LoaderCircle, ShieldCheck, Upload, Wallet, Database, ArrowUpRight, Rocket, Lock, Key, Link2, X, Zap } from "lucide-react";
 import { FintrixAssistant } from "./components/FintrixAssistant";
@@ -136,14 +138,14 @@ function WalletModal({ open, busy, onConnect, onClose }: { open: boolean; busy: 
               <div className="mb-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/5 border border-white/10">
                 <Link2 size={18} className="text-white relative z-10" />
               </div>
-              <h3 className="mb-3 font-headline text-2xl font-bold text-white relative z-10">Connect Albedo</h3>
+              <h3 className="mb-3 font-headline text-2xl font-bold text-white relative z-10">Albedo Wallet</h3>
               <p className="mb-8 text-sm leading-relaxed text-[#c6c6c6]/50 relative z-10 pr-4">
-                Universal Stellar signer for decentralized applications with seamless cross-device sync.
+                Connect using Albedo — a browser-based Stellar wallet. No extension needed.
               </p>
             </div>
 
             {!showAlbedoInput ? (
-              <button onClick={() => setShowAlbedoInput(true)} disabled={busy !== null} className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#c6c6c6]/70 transition-colors hover:text-white relative z-10 mt-auto focus:outline-none text-left">
+              <button onClick={() => { window.open("https://albedo.link", "_blank"); setShowAlbedoInput(true); }} disabled={busy !== null} className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#c6c6c6]/70 transition-colors hover:text-white relative z-10 mt-auto focus:outline-none text-left">
                 {busy === "albedo" ? "CONNECTING..." : "INITIALIZE"} <ArrowRight size={14} />
               </button>
             ) : (
@@ -335,9 +337,10 @@ function Landing({ wallet, metrics, featuredInvoices, transactions, onWallet, on
               `,
             }}
           />
-          <video className="absolute inset-0 h-full w-full object-cover mix-blend-screen opacity-100 pointer-events-none" autoPlay muted loop playsInline>
-            <source src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260217_030345_246c0224-10a4-422c-b324-070b7c0eceda.mp4" type="video/mp4" />
-          </video>
+          <div className="absolute inset-0 h-full w-full pointer-events-none overflow-hidden">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_40%,rgba(59,130,246,0.18),transparent_70%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_40%_40%_at_70%_30%,rgba(99,102,241,0.12),transparent_60%)]" />
+          </div>
           <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black to-transparent pointer-events-none" />
 
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative z-10 max-w-5xl px-4 text-center mt-[-5vh]">
@@ -1097,6 +1100,7 @@ function playNotificationTone() {
 }
 
 export default function App() {
+  const [loading, setLoading] = useState(true);
   const [view, setView] = useState<AppView>("landing");
   const [wallet, setWallet] = useState<ConnectedWallet | null>(null);
   const [networkSummary, setNetworkSummary] = useState({ network: "Stellar Testnet", sorobanRpcUrl: "Configured externally" });
@@ -1152,8 +1156,9 @@ export default function App() {
   useEffect(() => { if (assistantNotice) playNotificationTone(); }, [assistantNotice]);
 
   const metrics = useMemo(() => {
-    const capital = invoices.filter((invoice) => invoice.status !== "repaid").reduce((sum, invoice) => sum + invoice.amount, 0);
-    return [{ label: "Listed invoices", value: invoices.length, hint: "Loaded from the backend store" }, { label: "Capital in play", value: `$${capital.toLocaleString()}`, hint: "Marketplace principal value" }, { label: "Funded deals", value: invoices.filter((invoice) => invoice.status === "funded").length, hint: "Awaiting repayment" }, { label: "Activity events", value: transactions.length, hint: "List, fund, and repay actions" }];
+    const safeInvoices = Array.isArray(invoices) ? invoices : [];
+    const capital = safeInvoices.filter((invoice) => invoice.status !== "repaid").reduce((sum, invoice) => sum + invoice.amount, 0);
+    return [{ label: "Listed invoices", value: safeInvoices.length, hint: "Loaded from the backend store" }, { label: "Capital in play", value: `$${capital.toLocaleString()}`, hint: "Marketplace principal value" }, { label: "Funded deals", value: safeInvoices.filter((invoice) => invoice.status === "funded").length, hint: "Awaiting repayment" }, { label: "Activity events", value: transactions.length, hint: "List, fund, and repay actions" }];
   }, [invoices, transactions]);
 
   async function refreshTransactions() { setTransactions(await getTransactions()); }
@@ -1291,7 +1296,7 @@ export default function App() {
   const walletModal = <WalletModal open={walletModalOpen} busy={walletBusy} onConnect={connect} onClose={() => setWalletModalOpen(false)} />;
   const toasts = <AnimatePresence>{toast ? <Toast message={toast} /> : null}</AnimatePresence>;
 
-  if (view === "landing") return <ErrorBoundary><>{toasts}{walletModal}<Landing wallet={wallet} metrics={metrics} featuredInvoices={invoices.slice(0, 3)} transactions={transactions} onWallet={() => setWalletModalOpen(true)} onCreate={() => setView("upload")} onNavigate={setView} /></></ErrorBoundary>;
+  if (view === "landing") return <ErrorBoundary><AnimatePresence>{loading && <LoadingScreen onComplete={() => setLoading(false)} />}</AnimatePresence><div style={{ visibility: loading ? "hidden" : "visible" }}>{toasts}{walletModal}<Web3HeroLanding onLaunch={() => setView("upload")} /></div></ErrorBoundary>;
 
   if (!wallet) {
     return <ErrorBoundary><>{toasts}{walletModal}<AppShell view={view} setView={setView} wallet={wallet} network={networkSummary.network} onWallet={() => setWalletModalOpen(true)}><WalletGate onWallet={() => setWalletModalOpen(true)} /></AppShell><FintrixAssistant view={view} walletAddress={wallet?.publicKey} notification={assistantNotice} /></></ErrorBoundary>;
