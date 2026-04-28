@@ -1,4 +1,4 @@
-import { fundInvoice, jsonError, repayInvoice } from "../backend/service";
+import { jsonError, repayInvoice } from "../../backend/service";
 
 export default function handler(req: any, res: any) {
   const id = String(req.query?.id || "");
@@ -10,11 +10,6 @@ export default function handler(req: any, res: any) {
   }
 
   try {
-    if (action === "fund") {
-      res.status(200).json(fundInvoice(id, req.body?.funder || "UNKNOWN"));
-      return;
-    }
-
     if (action === "repay") {
       res.status(200).json(repayInvoice(id));
       return;

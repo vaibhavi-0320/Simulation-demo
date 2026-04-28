@@ -1,0 +1,107 @@
+.cursor-dot,
+.cursor-ring {
+  pointer-events: none;
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 99999;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+}
+
+.cursor-dot.cursor-visible,
+.cursor-ring.cursor-visible {
+  opacity: 1;
+}
+
+/* Only hide the native cursor when the JS-driven custom cursor is enabled. */
+.custom-cursor-enabled *,
+.custom-cursor-enabled *::before,
+.custom-cursor-enabled *::after {
+  cursor: none !important;
+}
+
+/* keep text inputs default when custom cursor is enabled */
+.custom-cursor-enabled input,
+.custom-cursor-enabled textarea,
+.custom-cursor-enabled select,
+.custom-cursor-enabled [contenteditable="true"] {
+  cursor: text !important;
+}
+
+/* clickable elements use native cursor only when custom cursor is not enabled; when enabled we hide it */
+.custom-cursor-enabled button,
+.custom-cursor-enabled a,
+.custom-cursor-enabled [role="button"],
+.custom-cursor-enabled .clickable,
+.custom-cursor-enabled label,
+.custom-cursor-enabled input[type="submit"],
+.custom-cursor-enabled input[type="button"],
+.custom-cursor-enabled input[type="checkbox"],
+.custom-cursor-enabled input[type="radio"] {
+  cursor: none !important;
+}
+
+.cursor-dot {
+  width: 8px;
+  height: 8px;
+  background: #ffffff;
+  border-radius: 9999px;
+  transition: transform 0.1s ease, background 0.2s ease, opacity 0.2s ease;
+}
+
+.cursor-ring {
+  width: 36px;
+  height: 36px;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  border-radius: 9999px;
+  transition: width 0.2s ease, height 0.2s ease, border-color 0.2s ease, background 0.2s ease, opacity 0.2s ease;
+  z-index: 99998;
+}
+
+.cursor-ring.cursor-hover {
+  width: 52px;
+  height: 52px;
+  border-color: rgba(100, 180, 255, 0.9);
+  background: rgba(100, 180, 255, 0.08);
+}
+
+.cursor-dot.cursor-hover {
+  transform: translate(-50%, -50%) scale(1.5);
+  background: rgb(100, 180, 255);
+}
+
+body.loading-screen .cursor-dot,
+body.loading-screen .cursor-ring {
+  display: none;
+}
+
+@media (max-width: 768px), (pointer: coarse) {
+  .cursor-dot,
+  .cursor-ring {
+    display: none !important;
+  }
+
+  * {
+    cursor: auto !important;
+  }
+
+  button,
+  a,
+  [role="button"],
+  .clickable,
+  label,
+  input[type="submit"],
+  input[type="button"],
+  input[type="checkbox"],
+  input[type="radio"] {
+    cursor: pointer !important;
+  }
+
+  input,
+  textarea,
+  select,
+  [contenteditable="true"] {
+    cursor: text !important;
+  }
+}

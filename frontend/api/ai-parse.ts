@@ -1,4 +1,4 @@
-import { jsonError, parseInvoice } from "../backend/service";
+import { jsonError, parseInvoice } from "../../backend/service";
 
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") {

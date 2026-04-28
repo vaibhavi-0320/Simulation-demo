@@ -1,5 +1,38 @@
 import { InvoiceParseResult } from "../types";
 
+export interface AssistantHistoryMessage {
+  role: "assistant" | "user";
+  text: string;
+}
+
+function buildLocalAssistantFallback(question: string, view: string, walletAddress?: string | null) {
+  const lower = question.toLowerCase();
+
+  if (lower.includes("upload") || lower.includes("invoice")) {
+    return "To upload an invoice in Fintrix, open Simulation, enter the invoice details, continue to AI parsing, review the draft, and submit it to the marketplace.";
+  }
+
+  if (lower.includes("trust score") || lower.includes("risk")) {
+    return "The Trust Score is Fintrix's invoice risk signal. It reflects factors like buyer quality, repayment horizon, invoice size, and overall deal strength so investors can compare opportunities quickly.";
+  }
+
+  if (lower.includes("wallet") || lower.includes("freighter") || lower.includes("albedo")) {
+    return walletAddress
+      ? `Your wallet ${walletAddress} is connected. Freighter supports extension-based signing, and Albedo supports web-based signing for Stellar.`
+      : "Use Connect Wallet to link Freighter or Albedo. Freighter is the main Stellar extension flow, while Albedo works through a web signing popup.";
+  }
+
+  if (lower.includes("fund") || lower.includes("marketplace") || lower.includes("invest")) {
+    return "Investors can browse invoice deals in Marketplace, review the APY and Trust Score, open a deal, and fund it after approving the Stellar wallet transaction.";
+  }
+
+  if (lower.includes("repay") || lower.includes("returns") || lower.includes("yield")) {
+    return "When an invoice matures and is repaid, the investor receives principal plus the quoted yield. Returns depend on the APY and the invoice duration.";
+  }
+
+  return `Fintrix is an AI-assisted invoice financing platform on Stellar. I can help with invoice uploads, Trust Scores, wallet setup, funding flows, and repayments. Current context: ${view}.`;
+}
+
 function fallbackParse(fileBase64: string): InvoiceParseResult {
   const payload = fileBase64.split(",")[1] || "";
   let decoded = "";
@@ -47,16 +80,38 @@ export async function askFintrixAssistant(input: {
   question: string;
   view: string;
   walletAddress?: string | null;
+  history?: AssistantHistoryMessage[];
 }) {
-  const response = await fetch("/api/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
+  try {
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: input.question,
+        view: input.view,
+        walletAddress: input.walletAddress ?? null,
+        history: input.history ?? [],
+      }),
+    });
 
-  if (!response.ok) {
-    throw new Error("Assistant unavailable right now.");
+    if (!response.ok) {
+      throw new Error("Chat request failed");
+    }
+
+    const parsed = await response.json();
+    if (parsed?.success && parsed?.data?.answer) {
+      return { answer: parsed.data.answer as string };
+    }
+
+    if (parsed?.answer) {
+      return { answer: parsed.answer as string };
+    }
+
+    throw new Error("Missing assistant answer");
+  } catch (error) {
+    console.warn("Using local assistant fallback", error);
+    return {
+      answer: buildLocalAssistantFallback(input.question, input.view, input.walletAddress ?? null),
+    };
   }
-
-  return (await response.json()) as { answer: string };
 }

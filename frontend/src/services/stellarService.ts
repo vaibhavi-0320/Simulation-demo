@@ -1,16 +1,12 @@
 import * as StellarSdk from "stellar-sdk";
-import { getAddress, getNetworkDetails, isAllowed, isConnected, requestAccess } from "@stellar/freighter-api";
+import { getAddress, getNetworkDetails, isAllowed, isConnected, requestAccess, signTransaction } from "@stellar/freighter-api";
 import { ConnectedWallet, Invoice, Transaction, WalletProvider } from "../types";
+import { getUserStorageKey, safeStorage } from "../utils/storage";
 
-const horizonServer = new StellarSdk.Horizon.Server("https://horizon-testnet.stellar.org");
-
-async function readJson<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status}`);
-  }
-
-  return response.json() as Promise<T>;
-}
+const HORIZON_URL = "https://horizon-testnet.stellar.org";
+const PASSPHRASE = "Test SDF Network ; September 2015";
+const API = import.meta.env.VITE_API_BASE || "";
+const horizonServer = new StellarSdk.Horizon.Server(HORIZON_URL);
 
 export function validatePublicKey(publicKey: string) {
   return StellarSdk.StrKey.isValidEd25519PublicKey(publicKey.trim());
@@ -18,12 +14,8 @@ export function validatePublicKey(publicKey: string) {
 
 export async function connectFreighterWallet(): Promise<ConnectedWallet> {
   const status = await isConnected();
-  if (status.error) {
+  if (status.error && !status.isConnected) {
     throw new Error(status.error.message);
-  }
-
-  if (!status.isConnected) {
-    throw new Error("Freighter extension not detected. Open the extension and try again.");
   }
 
   const permission = await isAllowed();
@@ -32,13 +24,28 @@ export async function connectFreighterWallet(): Promise<ConnectedWallet> {
   }
 
   const access = permission.isAllowed ? await getAddress() : await requestAccess();
-  if (access.error) {
-    throw new Error(access.error.message);
+  if (access.error && !access.address) {
+    const fallbackAddress = await getAddress();
+    if (fallbackAddress.error || !fallbackAddress.address) {
+      throw new Error(
+        access.error.message ||
+        fallbackAddress.error?.message ||
+        "Freighter is installed but did not provide an address. Unlock the extension, allow this site, and try again."
+      );
+    }
+    return {
+      publicKey: fallbackAddress.address,
+      provider: "freighter",
+      label: "Freighter",
+    };
   }
 
   const fallback = !access.address ? await getAddress() : access;
   if (fallback.error || !fallback.address) {
-    throw new Error(fallback.error?.message || "Freighter is connected but did not return an address. Re-open Freighter, approve this site, and try again.");
+    throw new Error(
+      fallback.error?.message ||
+      "Freighter is installed but did not return an address. Re-open Freighter, approve this site, and try again."
+    );
   }
 
   return {
@@ -51,7 +58,7 @@ export async function connectFreighterWallet(): Promise<ConnectedWallet> {
 export async function connectManualWallet(provider: WalletProvider, publicKey?: string): Promise<ConnectedWallet> {
   if (provider === "demo") {
     return {
-      publicKey: "GDEMO7QY5G4J6GQQF6T6X3GW6WOYFXKSGP2CYNV6GYZ2Q6XXDEMO",
+      publicKey: StellarSdk.Keypair.random().publicKey(),
       provider,
       label: "Demo Wallet",
     };
@@ -95,10 +102,50 @@ export async function getNetworkSummary() {
   }
 }
 
+const SEED_INVOICES: Invoice[] = [
+  { id: "#INV-4921", buyer: "TechLogistics Ltd", amount: 45000, discount: 8, due: "2026-10-24", status: "funded", seller: "demo", yield: 8.2, riskScore: 18, funded: 45000, tags: ["logistics", "uk"], aiSummary: "Tier-1 supplier", companyName: "TechLogistics Ltd", industry: "Logistics & Supply Chain", country: "India" },
+  { id: "#INV-4922", buyer: "Quantum Global", amount: 12800, discount: 9.5, due: "2026-11-02", status: "active", seller: "demo", yield: 9.5, riskScore: 35, funded: 0, tags: ["tech"], aiSummary: "SaaS provider", companyName: "Quantum Global", industry: "Technology & Software", country: "Singapore" },
+  { id: "#INV-4925", buyer: "Arcane Systems", amount: 2450, discount: 7.8, due: "2026-10-29", status: "funded", seller: "demo", yield: 7.8, riskScore: 22, funded: 2450, tags: ["hardware"], aiSummary: "Hardware manufacturer", companyName: "Arcane Systems", industry: "Defense & Aerospace", country: "United Kingdom" },
+];
+
+function getLocalInvoices(): Invoice[] {
+  const stored = safeStorage.get<Invoice[]>("invoices", []);
+  if (!stored.length) {
+    safeStorage.set("invoices", SEED_INVOICES);
+    return SEED_INVOICES;
+  }
+
+  const parsed = stored;
+  const needsRefresh = parsed.some((invoice) => invoice.id?.startsWith("#INV-492") && !invoice.companyName);
+  if (needsRefresh) {
+    const merged = SEED_INVOICES.map((seed) => {
+      const existing = parsed.find((invoice) => invoice.id === seed.id);
+      return existing
+        ? {
+            ...seed,
+            ...existing,
+            companyName: existing.companyName || seed.companyName,
+            industry: existing.industry || seed.industry,
+            country: existing.country || seed.country,
+          }
+        : seed;
+    });
+    const userInvoices = parsed.filter((invoice) => !SEED_INVOICES.some((seed) => seed.id === invoice.id));
+    const all = [...merged, ...userInvoices];
+    safeStorage.set("invoices", all);
+    return all;
+  }
+
+  return parsed;
+}
+
+function setLocalInvoices(invoices: Invoice[]) {
+  safeStorage.set("invoices", invoices);
+}
+
 export async function getInvoices(): Promise<Invoice[]> {
-  const res = await readJson<{ success: boolean; data: Invoice[] } | Invoice[]>(await fetch("/api/invoices"));
-  const arr = Array.isArray(res) ? res : (res as { data: Invoice[] }).data;
-  return Array.isArray(arr) ? arr : [];
+  await new Promise((res) => setTimeout(res, 300));
+  return getLocalInvoices();
 }
 
 export async function createInvoice(payload: {
@@ -109,42 +156,276 @@ export async function createInvoice(payload: {
   discount: number;
   seller: string;
   notes?: string;
+  companyName?: string;
+  industry?: string;
+  country?: string;
 }): Promise<Invoice> {
-  const res = await readJson<{ success: boolean; data: Invoice } | Invoice>(
-    await fetch("/api/invoices", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    }),
-  );
-  return (res as { data: Invoice }).data ?? (res as Invoice);
+  await new Promise((res) => setTimeout(res, 800));
+  const newInvoice: Invoice = {
+    id: payload.number || `#INV-${Math.floor(Math.random() * 10000)}`,
+    buyer: payload.buyer,
+    amount: payload.amount,
+    discount: payload.discount,
+    due: payload.due,
+    status: "active",
+    seller: payload.seller,
+    yield: payload.discount,
+    riskScore: Math.floor(Math.random() * 30) + 10,
+    funded: 0,
+    tags: ["new", "simulation"],
+    aiSummary: payload.notes?.trim() || "",
+    companyName: payload.companyName?.trim() || payload.buyer || "",
+    industry: payload.industry?.trim() || "",
+    country: payload.country?.trim() || "",
+  };
+  const current = getLocalInvoices();
+  setLocalInvoices([newInvoice, ...current]);
+  return newInvoice;
 }
 
-export async function fundInvoiceOnBackend(invoiceId: string, funder: string, provider: WalletProvider): Promise<Invoice> {
-  const res = await readJson<{ success: boolean; data: Invoice } | Invoice>(
-    await fetch(`/api/invoice-action?id=${encodeURIComponent(invoiceId)}&action=fund`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ funder, provider }),
+export async function fundInvoice(
+  invoiceId: string,
+  amountUSD: number,
+  deal: { company?: string; apy?: number; repaymentDate?: string }
+) {
+  const connected = await isConnected();
+  if (!connected || !connected.isConnected) {
+    throw new Error('Freighter is not connected. Click "Connect Wallet" first.');
+  }
+
+  const addrResult = await getAddress();
+  const investorPublicKey = addrResult?.address;
+
+  if (!investorPublicKey || investorPublicKey.length !== 56) {
+    throw new Error(`Invalid wallet address from Freighter: "${investorPublicKey}"`);
+  }
+
+  const buildRes = await fetch(`${API}/api/stellar/build`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      investorPublicKey,
+      amountUSD: Number(amountUSD),
+      invoiceId: String(invoiceId),
     }),
+  });
+
+  const buildData = await buildRes.json();
+
+  if (!buildRes.ok) {
+    throw new Error(buildData.error || `Build failed with status ${buildRes.status}`);
+  }
+
+  const { xdr } = buildData;
+
+  let signedXdr: string;
+  try {
+    const signResult = await signTransaction(xdr, {
+      networkPassphrase: PASSPHRASE,
+    });
+    signedXdr = (signResult as any).signedTxXdr;
+  } catch (error: any) {
+    const msg = error?.message || String(error);
+    if (msg.toLowerCase().includes("decli") || msg.toLowerCase().includes("reject") || msg.toLowerCase().includes("cancel")) {
+      throw new Error("You cancelled the transaction in Freighter.");
+    }
+    throw new Error(`Freighter signing error: ${msg}`);
+  }
+
+  if (!signedXdr) {
+    throw new Error("Freighter returned empty signed transaction.");
+  }
+
+  const submitRes = await fetch(`${API}/api/stellar/submit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      signedXdr,
+      invoiceId,
+      amountUSD,
+      company: deal.company,
+      apy: deal.apy,
+      repaymentDate: deal.repaymentDate,
+    }),
+  });
+
+  const submitData = await submitRes.json();
+
+  if (!submitRes.ok) {
+    throw new Error(submitData.error || `Submit failed with status ${submitRes.status}`);
+  }
+
+  try {
+    const portfolioEntry = {
+      txHash: submitData.txHash,
+      explorerUrl: submitData.explorerUrl,
+      invoiceId,
+      company: deal.company || "Unknown",
+      amountUSD: Number(amountUSD),
+      amountXLM: parseFloat(buildData.xlmAmount),
+      apy: deal.apy || 0,
+      APY: deal.apy || 0,
+      fundedAt: new Date().toISOString(),
+      maturityDate: deal.repaymentDate || null,
+      status: "active",
+      type: "investment",
+    };
+
+    safeStorage.append(getUserStorageKey(investorPublicKey, "portfolio"), portfolioEntry, 100);
+    safeStorage.append(getUserStorageKey(investorPublicKey, "activity"), {
+      type: "funded",
+      label: `Funded ${deal.company || "Unknown"} invoice`,
+      amount: `$${Number(amountUSD).toLocaleString()}`,
+      txHash: submitData.txHash,
+      timestamp: new Date().toISOString(),
+    }, 50);
+  } catch {
+    // Non-fatal: chain confirmation is the source of truth for this action.
+  }
+
+  return {
+    success: true,
+    txHash: submitData.txHash,
+    explorerUrl: submitData.explorerUrl,
+  };
+}
+
+export async function simulateOnTestnet(
+  amountUSD: number,
+  deal: { id: string; company?: string; apy?: number; durationDays?: number; repaymentDate?: string }
+) {
+  const connected = await isConnected();
+  if (!connected?.isConnected) {
+    throw new Error("Freighter not connected. Please connect your wallet first.");
+  }
+
+  const addrResult = await getAddress();
+  const investorPublicKey = addrResult?.address;
+  if (!investorPublicKey || investorPublicKey.length !== 56) {
+    throw new Error("Invalid wallet address from Freighter.");
+  }
+
+  const buildRes = await fetch(`${API}/api/stellar/build-simulation`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      investorPublicKey,
+      amountUSD: Number(amountUSD),
+      invoiceId: deal.id,
+      dealId: deal.id,
+    }),
+  });
+
+  const buildData = await buildRes.json();
+  if (!buildRes.ok) {
+    throw new Error(buildData.error || "Failed to build simulation");
+  }
+
+  const { xdr } = buildData;
+
+  let signedXdr: string;
+  try {
+    const signResult = await signTransaction(xdr, {
+      networkPassphrase: PASSPHRASE,
+    });
+    signedXdr = (signResult as any).signedTxXdr;
+  } catch (error: any) {
+    const msg = error?.message || String(error);
+    if (msg.toLowerCase().includes("decli") || msg.toLowerCase().includes("cancel") || msg.toLowerCase().includes("reject")) {
+      throw new Error("Simulation cancelled in Freighter.");
+    }
+    throw new Error(`Freighter signing failed: ${msg}`);
+  }
+
+  const submitRes = await fetch(`${API}/api/stellar/submit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ signedXdr, invoiceId: deal.id, amountUSD }),
+  });
+
+  const submitData = await submitRes.json();
+  if (!submitRes.ok) {
+    throw new Error(submitData.error || "Simulation submission failed");
+  }
+
+  const realSimId = `SIM-${submitData.txHash.substring(0, 8).toUpperCase()}`;
+  const expectedReturn = parseFloat(
+    (amountUSD * ((deal.apy || 0) / 100) * ((deal.durationDays || 180) / 365)).toFixed(2)
   );
-  return (res as { data: Invoice }).data ?? (res as Invoice);
+  const maturityDate = deal.repaymentDate ||
+    new Date(Date.now() + (deal.durationDays || 180) * 86400000).toISOString().split("T")[0];
+
+  const simRecord = {
+    simId: realSimId,
+    txHash: submitData.txHash,
+    explorerUrl: submitData.explorerUrl,
+    invoiceId: deal.id,
+    company: deal.company || "Unknown",
+    amountUSD,
+    expectedReturn,
+    maturityDate,
+    simulatedAt: new Date().toISOString(),
+    onChain: true,
+  };
+
+  try {
+    safeStorage.append(getUserStorageKey(investorPublicKey, "simulations"), simRecord, 100);
+    safeStorage.append(getUserStorageKey(investorPublicKey, "activity"), {
+      type: "simulation",
+      label: `Simulated ${deal.company || "Unknown"} return`,
+      amount: `$${Number(amountUSD).toLocaleString()}`,
+      txHash: submitData.txHash,
+      timestamp: new Date().toISOString(),
+    }, 50);
+  } catch {
+    // Best-effort local caching only.
+  }
+
+  return simRecord;
+}
+
+export async function fundInvoiceOnBackend(invoiceId: string, funder: string, provider: WalletProvider, amountUSD?: number): Promise<Invoice> {
+  const current = getLocalInvoices();
+  const invoice = current.find((item) => item.id === invoiceId);
+  if (!invoice) {
+    throw new Error("Invoice not found");
+  }
+
+  if (provider !== "freighter") {
+    throw new Error("Real testnet funding requires a connected Freighter wallet.");
+  }
+
+  const fundingAmountUSD = amountUSD || invoice.amount;
+  const investorPublicKey = funder;
+  const result = await fundInvoice(invoiceId, fundingAmountUSD, {
+    company: invoice.companyName || invoice.buyer,
+    apy: invoice.yield,
+    repaymentDate: invoice.due,
+  });
+
+  invoice.status = "funded";
+  invoice.funder = investorPublicKey;
+  invoice.funded = fundingAmountUSD;
+  invoice.txHash = result.txHash;
+  setLocalInvoices(current);
+
+  return invoice;
 }
 
 export async function repayInvoiceOnBackend(invoiceId: string): Promise<Invoice> {
-  const res = await readJson<{ success: boolean; data: Invoice } | Invoice>(
-    await fetch(`/api/invoice-action?id=${encodeURIComponent(invoiceId)}&action=repay`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-    }),
-  );
-  return (res as { data: Invoice }).data ?? (res as Invoice);
+  const current = getLocalInvoices();
+  const invoice = current.find((item) => item.id === invoiceId);
+  if (!invoice) {
+    throw new Error("Invoice not found");
+  }
+
+  invoice.status = "repaid";
+  setLocalInvoices(current);
+  return invoice;
 }
 
 export async function getTransactions(): Promise<Transaction[]> {
-  const res = await readJson<{ success: boolean; data: Transaction[] } | Transaction[]>(await fetch("/api/transactions"));
-  const arr = Array.isArray(res) ? res : (res as { data: Transaction[] }).data;
-  return Array.isArray(arr) ? arr : [];
+  return [];
 }
 
 export async function buildSorobanEscrowPreview(invoiceId: string, amount: number) {
@@ -183,4 +464,3 @@ export async function confirmFreighterAction() {
 
   return address.address;
 }
-

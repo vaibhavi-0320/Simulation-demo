@@ -19,9 +19,9 @@ const STATUS_LABELS = [
   "Preparing marketplace...",
 ] as const;
 
-const DURATION_MS = 2200;
-const WORD_INTERVAL_MS = 650;
-const COMPLETE_DELAY_MS = 100;
+const DURATION_MS = 4500;
+const WORD_INTERVAL_MS = 1100;
+const COMPLETE_DELAY_MS = 300;
 const EASE = [0.4, 0, 0.2, 1] as const;
 
 export function LoadingScreen({ onComplete }: LoadingScreenProps) {

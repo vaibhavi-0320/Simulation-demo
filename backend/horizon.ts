@@ -1,4 +1,4 @@
-import { Server, EventSourcePolyfill } from "@stellar/stellar-sdk";
+import { Horizon } from "@stellar/stellar-sdk";
 import { getSupabase } from "./supabase.ts";
 import { logger } from "./logger.ts";
 
@@ -18,7 +18,7 @@ interface HorizonEvent {
  */
 export async function startHorizonListener(contractAddress: string): Promise<void> {
   try {
-    const server = new Server(HORIZON_URL);
+    const server = new Horizon.Server(HORIZON_URL);
     logger.info({ contractAddress }, "Starting Horizon listener");
 
     // Start listening for transactions from the contract address
@@ -34,10 +34,6 @@ export async function startHorizonListener(contractAddress: string): Promise<voi
           logger.error({ error }, "Horizon stream error");
           horizonSynced = false;
         },
-      })
-      .catch((error) => {
-        logger.error({ error }, "Failed to start Horizon listener");
-        horizonSynced = false;
       });
 
     horizonSynced = true;
@@ -91,7 +87,7 @@ export function stopHorizonListener(): void {
 export async function pollHorizonTransactions(contractAddress: string, pollInterval: number = 10000): Promise<void> {
   setInterval(async () => {
     try {
-      const server = new Server(HORIZON_URL);
+      const server = new Horizon.Server(HORIZON_URL);
       const transactions = await server.transactions().forAccount(contractAddress).limit(10).call();
 
       for (const tx of transactions.records) {

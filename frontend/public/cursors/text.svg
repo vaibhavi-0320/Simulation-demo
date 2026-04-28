@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="12" height="24" viewBox="0 0 12 24">
+  <defs>
+    <filter id="glow" x="-80%" y="-40%" width="260%" height="180%">
+      <feFlood flood-color="#3b82f6" flood-opacity="0.9" result="glowColor" />
+      <feComposite in="glowColor" in2="SourceAlpha" operator="in" result="glowShape" />
+      <feGaussianBlur in="glowShape" stdDeviation="1.1" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+  <g filter="url(#glow)" stroke="white" stroke-width="1.2" stroke-linecap="round">
+    <line x1="2" y1="3" x2="10" y2="3" />
+    <line x1="6" y1="3" x2="6" y2="21" />
+    <line x1="2" y1="21" x2="10" y2="21" />
+  </g>
+</svg>

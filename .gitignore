@@ -1,11 +1,49 @@
+# Dependencies
 node_modules/
-.vite/
-dist/
 frontend/node_modules/
+
+# Build outputs
+dist/
 frontend/dist/
+.vite/
 target/
 contracts/*/target/
 contracts/*/test_snapshots/
+
+# Environment files (SECRETS - NEVER PUSH)
 .env
+.env.local
+.env.development
+.env.production
+.env.staging
 frontend/.env
+frontend/.env.local
+frontend/.env.development
+frontend/.env.production
+
+# Logs
+*.log
+*.err.log
+frontend/frontend-dev.log
+frontend/frontend-dev.err.log
+
+# Runtime data files (contain user/session data)
+frontend/data/visitors.json
+frontend/data/transactions.json
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# Design reference zips
 stitch_web3_hero_section.zip
+frontend/design-references/stitch_web3_hero_section/
+
+# Misc
+*.tsbuildinfo

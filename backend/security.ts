@@ -34,7 +34,13 @@ export function configureSecurity(app: Express) {
         "default-src": ["'self'"],
         "base-uri": ["'self'"],
         "frame-ancestors": ["'none'"],
-        "connect-src": ["'self'", "https://*.clerk.accounts.dev", "https://*.clerk.com", "https://horizon-testnet.stellar.org"],
+        "connect-src": [
+          "'self'", 
+          "https://*.clerk.accounts.dev", 
+          "https://*.clerk.com", 
+          "https://horizon-testnet.stellar.org",
+          ...(env.NODE_ENV !== "production" ? ["ws://127.0.0.1:*", "ws://localhost:*"] : [])
+        ],
         "script-src": ["'self'", "'unsafe-inline'", "https://*.clerk.accounts.dev", "https://*.clerk.com"],
         "style-src": ["'self'", "'unsafe-inline'", "https://api.fontshare.com"],
         "font-src": ["'self'", "https://api.fontshare.com", "https://cdn.fontshare.com", "data:"],

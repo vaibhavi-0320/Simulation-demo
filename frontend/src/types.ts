@@ -16,6 +16,10 @@ export interface Invoice {
   tags: string[];
   riskScore: number;
   aiSummary: string;
+  txHash?: string;
+  companyName?: string;
+  industry?: string;
+  country?: string;
 }
 
 export interface ConnectedWallet {

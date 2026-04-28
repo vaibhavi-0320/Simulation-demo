@@ -6,7 +6,7 @@
     "discount": 7,
     "due": "2026-04-01",
     "status": "repaid",
-    "seller": "GALWWE...T7SQ",
+    "seller": "demo",
     "yield": 7.8,
     "funded": 10,
     "tags": [
@@ -15,7 +15,9 @@
     ],
     "riskScore": 32,
     "aiSummary": "Invoice parsed and approved for simulated marketplace funding.",
-    "funder": "GALWWEGHOMU5YODTZBVGPFP2OHCJH5VO3VKWNMW7ZNT6OECINVPQT7SQ"
+    "funder": "GALWWEGHOMU5YODTZBVGPFP2OHCJH5VO3VKWNMW7ZNT6OECINVPQT7SQ",
+    "industry": "Consumer Goods & Retail",
+    "country": "India"
   },
   {
     "id": "3",
@@ -24,7 +26,7 @@
     "discount": 7,
     "due": "2026-03-31",
     "status": "repaid",
-    "seller": "GALWWE...T7SQ",
+    "seller": "demo",
     "yield": 7.8,
     "funded": 100,
     "tags": [
@@ -33,7 +35,9 @@
     ],
     "riskScore": 32,
     "aiSummary": "Invoice parsed and approved for simulated marketplace funding.",
-    "funder": "GALWWEGHOMU5YODTZBVGPFP2OHCJH5VO3VKWNMW7ZNT6OECINVPQT7SQ"
+    "funder": "GALWWEGHOMU5YODTZBVGPFP2OHCJH5VO3VKWNMW7ZNT6OECINVPQT7SQ",
+    "industry": "Manufacturing",
+    "country": "India"
   },
   {
     "id": "INV-1774954975035",
@@ -42,7 +46,7 @@
     "discount": 7,
     "due": "2026-04-30",
     "status": "active",
-    "seller": "GALWWE...T7SQ",
+    "seller": "demo",
     "yield": 7.8,
     "funded": 0,
     "tags": [
@@ -50,7 +54,9 @@
       "Prime"
     ],
     "riskScore": 32,
-    "aiSummary": "Fallback parser used for payload length 48262."
+    "aiSummary": "Fallback parser used for payload length 48262.",
+    "industry": "General Business Services",
+    "country": "United States"
   },
   {
     "id": "INV-001",
@@ -59,7 +65,7 @@
     "discount": 5,
     "due": "2026-05-15",
     "status": "active",
-    "seller": "GDEMO...XK4F",
+    "seller": "demo",
     "yield": 5.8,
     "funded": 0,
     "tags": [
@@ -67,7 +73,9 @@
       "Prime"
     ],
     "riskScore": 32,
-    "aiSummary": "Verified export invoice for a repeat buyer with moderate tenor and clean metadata."
+    "aiSummary": "Verified export invoice for a repeat buyer with moderate tenor and clean metadata.",
+    "industry": "Export & Trade Finance",
+    "country": "India"
   },
   {
     "id": "INV-002",
@@ -76,7 +84,7 @@
     "discount": 7,
     "due": "2026-06-01",
     "status": "active",
-    "seller": "GBETA...M9QR",
+    "seller": "demo",
     "yield": 8.4,
     "funded": 0,
     "tags": [
@@ -84,7 +92,9 @@
       "AI Screened"
     ],
     "riskScore": 51,
-    "aiSummary": "Large enterprise receivable with strong payoff size and clear shipping references."
+    "aiSummary": "Large enterprise receivable with strong payoff size and clear shipping references.",
+    "industry": "Technology & Software",
+    "country": "Singapore"
   },
   {
     "id": "INV-003",
@@ -93,8 +103,8 @@
     "discount": 4,
     "due": "2026-04-30",
     "status": "funded",
-    "seller": "GGAMMA...PN2",
-    "funder": "GFUND...1234",
+    "seller": "demo",
+    "funder": "demo",
     "yield": 4.8,
     "funded": 15200,
     "tags": [
@@ -102,6 +112,8 @@
       "Settling Soon"
     ],
     "riskScore": 28,
-    "aiSummary": "Short duration invoice already committed by an investor and awaiting simulated repayment."
+    "aiSummary": "Short duration invoice already committed by an investor and awaiting simulated repayment.",
+    "industry": "Logistics & Supply Chain",
+    "country": "India"
   }
 ]

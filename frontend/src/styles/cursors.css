@@ -1,0 +1,58 @@
+/* Fintrix Stellar Cursor System */
+
+@media (hover: hover) and (pointer: fine) {
+  /* When the app is showing the loading/splash screen we disable the custom cursor */
+  body.loading-screen *, body.loading-screen *::before, body.loading-screen *::after {
+    cursor: auto !important;
+  }
+  *, *::before, *::after {
+    cursor: url("/cursors/default.svg") 4 2, auto !important;
+  }
+
+  a,
+  button,
+  [role="button"],
+  [onClick],
+  select,
+  label,
+  .clickable,
+  [class*="btn"],
+  [class*="button"],
+  [class*="deal"],
+  [class*="card"]:not([class*="stat"]),
+  [class*="tab"],
+  [class*="nav-item"],
+  [class*="disconnect"],
+  [class*="connect"] {
+    cursor: url("/cursors/pointer.svg") 8 2, pointer !important;
+  }
+
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="password"],
+  textarea,
+  [contenteditable] {
+    cursor: url("/cursors/text.svg") 6 12, text !important;
+  }
+
+  button:disabled,
+  [disabled],
+  [aria-disabled="true"] {
+    cursor: url("/cursors/not-allowed.svg") 12 12, not-allowed !important;
+  }
+
+  [aria-busy="true"],
+  .is-loading,
+  [data-loading="true"] {
+    cursor: url("/cursors/wait.svg") 12 12, wait !important;
+  }
+
+  [class*="resize-h"] {
+    cursor: ew-resize !important;
+  }
+
+  [class*="resize-v"] {
+    cursor: ns-resize !important;
+  }
+}

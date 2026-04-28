@@ -1,4 +1,4 @@
-import { askAssistant, jsonError } from "../backend/service";
+import { askAssistant, jsonError } from "../../backend/service";
 
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") {
@@ -11,6 +11,7 @@ export default async function handler(req: any, res: any) {
       question: String(req.body?.question || ""),
       walletAddress: req.body?.walletAddress,
       view: req.body?.view,
+      history: Array.isArray(req.body?.history) ? req.body.history : [],
     }));
   } catch (error) {
     res.status(500).json(jsonError(error));

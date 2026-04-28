@@ -1,291 +1,337 @@
-import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Store, Loader, TrendingUp, DollarSign } from 'lucide-react';
-import { getAllInvoices, fundInvoice, Invoice } from '../services/invoiceApi';
-import { ConnectedWallet } from '../types';
+import React, { useState, useMemo } from "react";
+import { useViewport } from "../hooks/useViewport";
+import { SkeletonMarketplace } from "./PageSkeletons";
+import { usePageSkeleton } from "../hooks/usePageSkeleton";
 
-interface MarketplaceViewProps {
-  wallet: ConnectedWallet;
-  onDealClick: (dealId: string) => void;
-  onBack: () => void;
-  showToast: (message: string, type: 'success' | 'error' | 'info') => void;
+interface Invoice {
+  id: string;
+  buyer: string;
+  amount: number;
+  due: string;
+  status: string;
+  yield: number;
+  riskScore: number;
 }
 
-export default function MarketplaceView({
-  wallet,
-  onDealClick,
-  onBack,
-  showToast,
-}: MarketplaceViewProps) {
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [fundingId, setFundingId] = useState<string | null>(null);
-  const [quickFundAmount, setQuickFundAmount] = useState<Record<string, string>>({});
+interface MarketplaceViewProps {
+  invoices: Invoice[];
+  onFund: (id: string) => Promise<void>;
+  onViewDetail: (id: string) => void;
+  sidebarOpen: boolean;
+}
 
-  useEffect(() => {
-    loadInvoices();
-  }, []);
+const glassCard: React.CSSProperties = {
+  background: "rgba(255,255,255,0.03)",
+  backdropFilter: "blur(10px)",
+  borderTop: "1px solid rgba(255,255,255,0.1)",
+  borderLeft: "1px solid rgba(255,255,255,0.05)",
+  borderRight: "1px solid transparent",
+  borderBottom: "1px solid transparent",
+  boxShadow: "0 0 20px rgba(255,255,255,0.03)",
+};
 
-  const loadInvoices = async () => {
-    setLoading(true);
-    try {
-      const data = await getAllInvoices();
-      setInvoices(data);
-    } catch (error: any) {
-      showToast(error.message || 'Failed to load invoices', 'error');
-    } finally {
-      setLoading(false);
-    }
+export default function MarketplaceView({ invoices, onFund, onViewDetail, sidebarOpen }: MarketplaceViewProps) {
+  const { isMobile, isTablet } = useViewport();
+  const loading = usePageSkeleton("marketplace");
+  const [statusTab, setStatusTab] = useState<"all" | "active" | "funded" | "repaid">("all");
+  const [minApy, setMinApy] = useState(0);
+  const [maxDuration, setMaxDuration] = useState(120);
+  const [riskFilter, setRiskFilter] = useState<"all" | "low" | "medium" | "high">("all");
+  const [search, setSearch] = useState("");
+  // FIXED: Bug 3 — simulator modal state
+  const [simOpen, setSimOpen] = useState(false);
+  const [simAmount, setSimAmount] = useState(5000);
+  const [simApy, setSimApy] = useState(10);
+  const [simDuration, setSimDuration] = useState(90);
+
+  const sideW = isMobile ? "0" : sidebarOpen ? "16rem" : "4.5rem";
+
+  // FIXED: Bug 3 — calculate simulator outputs
+  const simReturn = simAmount * (simApy / 100) * (simDuration / 365);
+  const simTotal = simAmount + simReturn;
+
+  const filtered = useMemo(() => {
+    const base = invoices.length > 0 ? invoices : [
+      { id: "INV-8829-X", buyer: "TechLogistics Ltd", amount: 45000, due: "2024-12-01", status: "active", yield: 12.5, riskScore: 20 },
+      { id: "INV-4412-Q", buyer: "Quantum Global", amount: 12750, due: "2024-11-15", status: "active", yield: 9.2, riskScore: 50 },
+      { id: "INV-9901-S", buyer: "Solaris Networks", amount: 5400, due: "2025-02-01", status: "funded", yield: 10.8, riskScore: 45 },
+    ];
+    return base.filter((inv) => {
+      const byStatus = statusTab === "all" || inv.status === statusTab;
+      const byApy = inv.yield >= minApy;
+      const riskLevel = inv.riskScore < 40 ? "low" : inv.riskScore < 65 ? "medium" : "high";
+      const byRisk = riskFilter === "all" || riskLevel === riskFilter;
+      const bySearch = !search || inv.buyer.toLowerCase().includes(search.toLowerCase()) || inv.id.toLowerCase().includes(search.toLowerCase());
+      return byStatus && byApy && byRisk && bySearch;
+    });
+  }, [invoices, statusTab, minApy, riskFilter, search]);
+
+  const totalVolume = useMemo(() => invoices.reduce((s: number, i: any) => s + i.amount, 0), [invoices]);
+
+  if (loading) return <SkeletonMarketplace sidebarOpen={sidebarOpen} />;
+
+  const fundingPct = (inv: Invoice) => {
+    if (inv.status === "funded" || inv.status === "repaid") return 100;
+    if (inv.status === "active") return Math.floor(15 + (inv.riskScore * 0.5));
+    return 0;
   };
-
-  const getDaysUntilDue = (dateStr: string) => {
-    const due = new Date(dateStr);
-    const now = new Date();
-    const diff = due.getTime() - now.getTime();
-    return Math.ceil(diff / (1000 * 60 * 60 * 24));
-  };
-
-  const getProgressPercent = (invoice: Invoice) => {
-    if (invoice.fundedAmount === 0) return 0;
-    return Math.min(100, Math.round((invoice.fundedAmount / invoice.amount) * 100));
-  };
-
-  const handleQuickFund = async (e: React.MouseEvent, invoice: Invoice) => {
-    e.stopPropagation(); // Don't navigate to deal page
-
-    if (invoice.ownerWallet === wallet.publicKey) {
-      showToast('You cannot fund your own invoice', 'error');
-      return;
-    }
-
-    const amount = Number(quickFundAmount[invoice.id] || 500);
-    if (!Number.isFinite(amount) || amount < 100) {
-      showToast('Minimum investment is $100', 'error');
-      return;
-    }
-
-    const remaining = invoice.amount - invoice.fundedAmount;
-    if (amount > remaining) {
-      showToast(`Maximum amount is $${remaining.toLocaleString()}`, 'error');
-      return;
-    }
-
-    setFundingId(invoice.id);
-    try {
-      const result = await fundInvoice({
-        invoiceId: invoice.id,
-        funderWallet: wallet.publicKey,
-        fundAmount: amount,
-      });
-
-      showToast(
-        `You funded $${amount.toLocaleString()}. Expected return: $${result.expectedReturn.toLocaleString('en-US', { maximumFractionDigits: 2 })}`,
-        'success'
-      );
-      loadInvoices(); // Refresh
-    } catch (error: any) {
-      showToast(error.message || 'Failed to fund invoice', 'error');
-    } finally {
-      setFundingId(null);
-    }
-  };
-
-  const totalOpportunity = invoices.reduce((sum, inv) => sum + inv.amount, 0);
 
   return (
-    <div className="px-4 py-12 sm:px-6 lg:px-8">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <button
-          onClick={onBack}
-          className="mb-8 flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Dashboard
-        </button>
-
-        {/* Title */}
-        <div className="mb-8">
-          <div className="inline-flex items-center gap-3 bg-green-500/10 border border-green-500/20 rounded-full px-4 py-2 mb-4">
-            <Store className="h-4 w-4 text-green-400" />
-            <span className="text-sm text-green-300">Live Marketplace</span>
+    <div className="page-fade-in" style={{ marginLeft: sideW, minHeight: "100vh", background: "#000", color: "#e2e2e2", fontFamily: "Inter, sans-serif", transition: "margin-left 0.28s cubic-bezier(.4,0,.2,1)" }}>
+      {/* TopBar */}
+      <header style={{ position: "sticky", top: 0, zIndex: 40, background: "rgba(10,10,10,0.9)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "space-between", padding: isMobile ? "0 1rem 0 4rem" : "0 2rem", height: "4rem", gap: "1rem" }}>
+        <span style={{ fontSize: "0.875rem", fontWeight: 500, color: "rgba(255,255,255,0.5)" }}>Marketplace / Opportunities</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem", flex: isMobile ? 1 : "unset", justifyContent: "flex-end" }}>
+          <div style={{ position: "relative" }}>
+            <span style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", fontSize: "1rem", color: "rgba(255,255,255,0.4)" }}>🔍</span>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search Invoices..."
+              style={{ background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "0.5rem", padding: "0.375rem 1rem 0.375rem 2.5rem", fontSize: "0.875rem", color: "rgba(255,255,255,0.8)", outline: "none", width: isMobile ? "min(52vw, 220px)" : "220px", fontFamily: "Inter, sans-serif" }}
+            />
           </div>
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-            <div>
-              <h1 className="text-4xl font-bold text-white mb-2">Marketplace</h1>
-              <p className="text-slate-400 text-lg">
-                Fund invoices to earn yield. You cannot fund your own invoice.
-              </p>
-            </div>
-            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg px-6 py-4">
-              <p className="text-sm text-slate-400">Total Opportunity</p>
-              <p className="text-3xl font-bold text-white">
-                ${totalOpportunity.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-              </p>
-            </div>
-          </div>
+          {/* FIXED: Bug 4 (Option B) — removed non-functional bell/settings icons */}
         </div>
+      </header>
 
-        {/* Loading State */}
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader className="h-6 w-6 text-blue-400 animate-spin" />
+      <div style={{ padding: isMobile ? "1.25rem 1rem 5.5rem" : "2.5rem", maxWidth: "1200px", margin: "0 auto" }}>
+        {/* Header */}
+        <section style={{ display: "flex", justifyContent: "space-between", alignItems: isMobile ? "flex-start" : "flex-end", gap: "1.5rem", marginBottom: "3rem", flexWrap: "wrap", flexDirection: isMobile ? "column" : "row" }}>
+          <div>
+            <h1 style={{ fontSize: "2rem", fontWeight: 600, color: "#fff", letterSpacing: "-0.03em", marginBottom: "0.5rem" }}>Invoice Opportunities</h1>
+            <p style={{ color: "#c4c7c8", fontSize: "0.9375rem" }}>Browse available invoices, evaluate risk and yield, and fund opportunities.</p>
           </div>
-        ) : invoices.length === 0 ? (
-          <div className="text-center py-12 bg-slate-800/50 rounded-lg border border-white/10">
-            <Store className="h-12 w-12 text-slate-600 mx-auto mb-4" />
-            <p className="text-slate-400 text-lg">No invoices available yet</p>
-            <p className="text-slate-500 text-sm mt-2">Upload an invoice to get started</p>
+          <div style={{ ...glassCard, padding: "1.5rem", borderRadius: "0.75rem", minWidth: "220px" }}>
+            <p style={{ fontSize: "12px", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#c4c7c8", marginBottom: "0.25rem" }}>Total Marketplace Volume</p>
+            <p style={{ fontSize: "2rem", fontWeight: 600, color: "#fff", letterSpacing: "-0.03em" }}>${(totalVolume / 1000).toFixed(1)}K</p>
           </div>
-        ) : (
-          <div className="space-y-6">
-            {invoices.map((invoice) => {
-              const daysUntilDue = getDaysUntilDue(invoice.dueDate);
-              const progress = getProgressPercent(invoice);
-              const isOwn = invoice.ownerWallet === wallet.publicKey;
-              const remaining = invoice.amount - invoice.fundedAmount;
-              const isFunding = fundingId === invoice.id;
+        </section>
 
-              return (
-                <div
-                  key={invoice.id}
-                  className="bg-slate-800/50 border border-white/10 hover:border-blue-500/40 rounded-xl p-6 transition-all hover:shadow-lg group"
-                >
-                  {/* Click area for detail */}
-                  <button
-                    onClick={() => onDealClick(invoice.id)}
-                    className="w-full text-left"
-                  >
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-start">
-                      {/* Company & Status */}
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="text-xs text-slate-500 font-semibold uppercase">Company</p>
-                          <span
-                            className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                              invoice.status === 'OPEN'
-                                ? 'bg-green-500/15 text-green-400'
-                                : invoice.status === 'FUNDED'
-                                  ? 'bg-blue-500/15 text-blue-400'
-                                  : 'bg-slate-500/15 text-slate-400'
-                            }`}
-                          >
-                            {invoice.status}
-                          </span>
-                        </div>
-                        <h3 className="text-lg font-bold text-white">{invoice.companyName}</h3>
-                        {isOwn && (
-                          <span className="text-[10px] bg-purple-500/15 text-purple-300 px-2 py-0.5 rounded-full font-semibold mt-1 inline-block">
-                            YOUR INVOICE
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Amount */}
-                      <div>
-                        <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Amount</p>
-                        <p className="text-2xl font-bold text-white">
-                          ${invoice.amount.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                        </p>
-                      </div>
-
-                      {/* Yield & Duration */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Yield</p>
-                          <p className="text-lg font-bold text-green-400 flex items-center gap-1">
-                            <TrendingUp className="h-4 w-4" />
-                            {invoice.yield.toFixed(1)}%
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-slate-500 font-semibold uppercase mb-1">Duration</p>
-                          <p className="text-lg font-bold text-white">{daysUntilDue}d</p>
-                        </div>
-                      </div>
-
-                      {/* Progress */}
-                      <div>
-                        <p className="text-xs text-slate-500 font-semibold uppercase mb-2">Funding</p>
-                        <div className="w-full bg-slate-700 rounded-full h-2">
-                          <div
-                            className="bg-gradient-to-r from-blue-500 to-blue-400 h-2 rounded-full transition-all"
-                            style={{ width: `${progress}%` }}
-                          />
-                        </div>
-                        <p className="text-xs text-slate-400 mt-2">
-                          {progress}% — ${invoice.fundedAmount.toLocaleString('en-US', { maximumFractionDigits: 0 })} / $
-                          {invoice.amount.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                        </p>
-                      </div>
-
-                      {/* Quick Fund */}
-                      <div className="flex items-end justify-end">
-                        {invoice.status === 'REPAID' ? (
-                          <span className="text-xs bg-slate-600/20 text-slate-400 px-3 py-2 rounded-lg font-medium">
-                            Completed
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
+        {/* Filters */}
+        <section style={{ ...glassCard, borderRadius: "0.75rem", padding: "2rem", marginBottom: "2rem" }}>
+          <div style={{ display: "flex", gap: "0.5rem", background: "rgba(255,255,255,0.05)", width: "100%", borderRadius: "0.5rem", padding: "4px", marginBottom: "2rem", overflowX: "auto" }}>
+            {(["all", "active", "funded", "repaid"] as const).map((tab) => (
+              <button key={tab} onClick={() => setStatusTab(tab)} style={{ padding: "0.5rem 1.5rem", borderRadius: "6px", fontSize: "0.875rem", fontWeight: 500, cursor: "pointer", border: "none", fontFamily: "Inter, sans-serif", background: statusTab === tab ? "rgba(255,255,255,0.1)" : "transparent", color: statusTab === tab ? "#fff" : "rgba(255,255,255,0.4)", transition: "all 0.2s" }}>
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "2rem", alignItems: "flex-end" }}>
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem" }}>
+                <label style={{ fontSize: "12px", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", color: "#c4c7c8" }}>Min APY</label>
+                <span style={{ color: "#fff", fontFamily: "monospace", fontSize: "0.875rem" }}>{minApy}%</span>
+              </div>
+              <input type="range" min="0" max="20" value={minApy} onChange={(e) => setMinApy(Number(e.target.value))} style={{ width: "100%", accentColor: "#fff", height: "4px" }} />
+            </div>
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem" }}>
+                <label style={{ fontSize: "12px", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", color: "#c4c7c8" }}>Max Duration</label>
+                <span style={{ color: "#fff", fontFamily: "monospace", fontSize: "0.875rem" }}>{maxDuration}d</span>
+              </div>
+              <input type="range" min="7" max="180" value={maxDuration} onChange={(e) => setMaxDuration(Number(e.target.value))} style={{ width: "100%", accentColor: "#fff", height: "4px" }} />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: "12px", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", color: "#c4c7c8", marginBottom: "1rem" }}>Risk Level</label>
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                {(["all", "low", "medium", "high"] as const).map((r) => (
+                  <button key={r} onClick={() => setRiskFilter(r)} style={{ flex: 1, padding: "0.5rem 0", background: riskFilter === r ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.05)", border: riskFilter === r ? "1px solid rgba(255,255,255,0.4)" : "1px solid rgba(255,255,255,0.1)", borderRadius: "0.5rem", color: riskFilter === r ? "#fff" : "rgba(255,255,255,0.8)", fontSize: "12px", fontWeight: 600, cursor: "pointer", fontFamily: "Inter, sans-serif" }}>
+                    {r.charAt(0).toUpperCase() + r.slice(1)}
                   </button>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button onClick={() => { setStatusTab("all"); setMinApy(0); setMaxDuration(120); setRiskFilter("all"); setSearch(""); }} style={{ display: "flex", alignItems: "center", gap: "0.5rem", background: "transparent", border: "none", color: "rgba(255,255,255,0.6)", fontSize: "0.875rem", cursor: "pointer", fontFamily: "Inter, sans-serif" }}>
+                <span style={{ fontSize: "1.125rem", fontWeight: 700 }}>↺</span> Clear Filters
+              </button>
+            </div>
+          </div>
+        </section>
 
-                  {/* Quick Fund Row */}
-                  {invoice.status === 'OPEN' && !isOwn && remaining > 0 && (
-                    <div className="mt-4 pt-4 border-t border-white/5 flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                      <div className="flex items-center gap-2 flex-1">
-                        <span className="text-xs text-slate-500">Quick fund:</span>
-                        <div className="relative">
-                          <span className="absolute left-2.5 top-1.5 text-slate-500 text-xs">$</span>
-                          <input
-                            type="number"
-                            value={quickFundAmount[invoice.id] ?? '500'}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              setQuickFundAmount({ ...quickFundAmount, [invoice.id]: e.target.value });
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            min="100"
-                            max={remaining}
-                            className="w-28 pl-6 pr-2 py-1.5 text-xs rounded-lg bg-slate-700 border border-white/10 text-white focus:outline-none focus:border-blue-500"
-                          />
+        {/* Grid + Side */}
+        <div style={{ display: "grid", gridTemplateColumns: isTablet ? "1fr" : "1fr 280px", gap: "2rem" }}>
+          {/* Invoice Cards */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+            {filtered.length === 0 ? (
+              <div style={{ ...glassCard, borderRadius: "1rem", padding: "4rem", textAlign: "center" }}>
+                <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "1rem" }}>No invoices match your filters.</p>
+              </div>
+            ) : filtered.map((inv, idx) => {
+              const pct = fundingPct(inv);
+              const riskLabel = inv.riskScore < 40 ? "A+" : inv.riskScore < 65 ? "B" : "B+";
+              const durDays = Math.max(1, Math.ceil((new Date(inv.due).getTime() - Date.now()) / (1000 * 86400)));
+              return (
+                <div key={inv.id || idx} style={{ ...glassCard, borderRadius: "1rem", padding: "2rem", display: "flex", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", gap: "2rem", alignItems: isMobile ? "stretch" : "center", transition: "border-top-color 0.3s" }}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.borderTopColor = "rgba(255,255,255,0.2)")}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.borderTopColor = "rgba(255,255,255,0.1)")}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexDirection: isMobile ? "column" : "row", gap: "1rem", marginBottom: "1.5rem" }}>
+                      <div>
+                        <h3 style={{ fontSize: "1.5rem", fontWeight: 600, color: "#fff", letterSpacing: "-0.02em", marginBottom: "0.25rem" }}>{inv.buyer}</h3>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                          <span style={{ padding: "2px 8px", background: "rgba(2,102,255,0.2)", color: "#b3c5ff", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", borderRadius: "4px" }}>Simulation Data</span>
+                          <span style={{ color: "rgba(255,255,255,0.4)", fontSize: "12px" }}>• {inv.id}</span>
                         </div>
-                        <span className="text-xs text-slate-500">
-                          (max: ${remaining.toLocaleString()})
-                        </span>
                       </div>
-                      <button
-                        onClick={(e) => handleQuickFund(e, invoice)}
-                        disabled={isFunding}
-                        className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors flex items-center gap-2"
-                      >
-                        {isFunding ? (
-                          <>
-                            <Loader className="h-3.5 w-3.5 animate-spin" />
-                            Funding...
-                          </>
-                        ) : (
-                          <>
-                            <DollarSign className="h-3.5 w-3.5" />
-                            Fund
-                          </>
-                        )}
-                      </button>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", color: "#0266ff", gap: "4px", marginBottom: "4px" }}>
+                          <span style={{ fontSize: "14px", fontWeight: 900 }}>✓</span>
+                          <span style={{ fontSize: "12px", fontWeight: 600, letterSpacing: "0.05em" }}>Funding Open</span>
+                        </div>
+                        <p style={{ fontSize: "1.5rem", fontWeight: 600, color: "#fff", letterSpacing: "-0.02em" }}>${inv.amount.toLocaleString()}.00</p>
+                      </div>
                     </div>
-                  )}
-
-                  {invoice.status === 'OPEN' && isOwn && (
-                    <div className="mt-4 pt-4 border-t border-white/5">
-                      <p className="text-xs text-slate-500">
-                        This is your invoice — waiting for investors to fund it.
-                      </p>
+                    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: "1rem", padding: "1.5rem 0", borderTop: "1px solid rgba(255,255,255,0.05)", borderBottom: "1px solid rgba(255,255,255,0.05)", marginBottom: "1.5rem" }}>
+                      {[
+                        { label: "Yield (APY)", value: `${inv.yield}%` },
+                        { label: "Duration", value: `${durDays} Days` },
+                        { label: "Risk Rating", value: riskLabel },
+                      ].map((stat) => (
+                        <div key={stat.label}>
+                          <p style={{ fontSize: "12px", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", color: "#c4c7c8", marginBottom: "4px" }}>{stat.label}</p>
+                          <p style={{ color: "#fff", fontFamily: "monospace", fontSize: "1.125rem" }}>{stat.value}</p>
+                        </div>
+                      ))}
                     </div>
-                  )}
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", fontFamily: "monospace", marginBottom: "0.5rem" }}>
+                        <span style={{ color: "rgba(255,255,255,0.6)" }}>${(inv.amount * pct / 100).toLocaleString()} Funded</span>
+                        <span style={{ color: "#fff" }}>{pct}% Complete</span>
+                      </div>
+                      <div style={{ height: "6px", background: "rgba(255,255,255,0.1)", borderRadius: "9999px", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${pct}%`, background: "#0266ff", transition: "width 0.5s ease" }} />
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ width: isMobile ? "100%" : "auto" }}>
+                    <button
+                      onClick={() => onViewDetail(inv.id)}
+                      style={{ padding: "0.75rem 1.5rem", background: "#fff", color: "#000", border: "none", borderRadius: "0.5rem", fontWeight: 700, fontSize: "0.875rem", cursor: "pointer", whiteSpace: "nowrap", fontFamily: "Inter, sans-serif", transition: "opacity 0.2s", minWidth: "120px", width: isMobile ? "100%" : "auto" }}
+                      onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = "0.9")}
+                      onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = "1")}
+                    >
+                      View Details
+                    </button>
+                  </div>
                 </div>
               );
             })}
           </div>
-        )}
+
+          {/* Side Panel */}
+          <aside style={{ position: isTablet ? "relative" : "sticky", top: "5rem", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+            <div style={{ ...glassCard, borderRadius: "1rem", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", color: "#0266ff" }}>
+                <span style={{ fontSize: "1.25rem" }}>🛡️</span>
+                <h4 style={{ fontWeight: 700, fontSize: "0.875rem", letterSpacing: "0.05em", color: "#fff", textTransform: "uppercase" }}>Risk Detector</h4>
+              </div>
+              <p style={{ fontSize: "0.9375rem", color: "#c4c7c8", lineHeight: 1.6 }}>
+                Fintrix algorithms have detected optimal liquidity in the <strong style={{ color: "#fff" }}>10–12% APY range</strong>. Diversify across sectors to mitigate industry-specific risks.
+              </p>
+              <div style={{ padding: "1rem", background: "rgba(255,255,255,0.05)", borderRadius: "0.75rem", border: "1px solid rgba(255,255,255,0.05)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.75rem" }}>
+                  <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.5)" }}>Market Health</span>
+                  <span style={{ fontSize: "12px", color: "#4ade80", fontFamily: "monospace" }}>Stable</span>
+                </div>
+                <div style={{ height: "4px", background: "rgba(255,255,255,0.1)", borderRadius: "9999px" }}>
+                  <div style={{ height: "100%", width: "75%", background: "rgba(74,222,128,0.6)", borderRadius: "9999px" }} />
+                </div>
+              </div>
+              <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: "1rem" }}>
+                <a href="#" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", textDecoration: "none" }}>
+                  <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)" }}>Risk Framework Documentation</span>
+                  <span style={{ fontSize: "1.25rem", color: "rgba(255,255,255,0.2)" }}>→</span>
+                </a>
+              </div>
+            </div>
+            <div style={{ ...glassCard, borderRadius: "1rem", padding: "1.5rem", position: "relative", overflow: "hidden" }}>
+              <div style={{ position: "relative", zIndex: 1 }}>
+                <h4 style={{ fontWeight: 700, fontSize: "0.875rem", color: "#fff", marginBottom: "0.5rem" }}>Simulate Returns</h4>
+                <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.6)", marginBottom: "1rem" }}>Use our Web3 engine to forecast yields over a 12-month period.</p>
+                <button
+                  onClick={() => {
+                    setSimOpen(true);
+                    // Fix 4: Increment simulations run counter on simulator action
+                    const current = parseInt(localStorage.getItem('simulationsRun') || '0', 10);
+                    localStorage.setItem('simulationsRun', String(current + 1));
+                  }}
+                  style={{ width: "100%", padding: "0.5rem", background: "rgba(255,255,255,0.1)", color: "#fff", border: "none", borderRadius: "0.5rem", fontSize: "12px", fontWeight: 600, cursor: "pointer", fontFamily: "Inter, sans-serif" }}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.15)")}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.1)")}
+                >
+                  Launch Simulator
+                </button>
+              </div>
+              <span style={{ position: "absolute", right: "-16px", bottom: "-16px", fontSize: "8rem", color: "rgba(255,255,255,0.05)" }}>📈</span>
+            </div>
+          </aside>
+        </div>
       </div>
+
+      {/* FIXED: Bug 3 — Returns Simulator Modal */}
+      {simOpen && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div onClick={() => setSimOpen(false)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }} />
+          <div style={{ position: "relative", width: "calc(100vw - 2rem)", maxWidth: "480px", background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "1rem", padding: "2rem", boxShadow: "0 30px 80px rgba(0,0,0,0.6)", maxHeight: "85vh", overflowY: "auto" }}>
+            <button onClick={() => setSimOpen(false)} style={{ position: "absolute", top: "1rem", right: "1rem", background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", width: "32px", height: "32px", borderRadius: "50%", cursor: "pointer", fontSize: "1rem", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+            <h3 style={{ fontSize: "1.25rem", fontWeight: 600, color: "#fff", letterSpacing: "-0.02em", marginBottom: "0.25rem" }}>Returns Simulator</h3>
+            <p style={{ fontSize: "0.8125rem", color: "rgba(255,255,255,0.5)", marginBottom: "2rem" }}>Forecast your potential yield based on investment parameters.</p>
+
+            {/* Investment Amount */}
+            <div style={{ marginBottom: "1.5rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                <label style={{ fontSize: "12px", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)" }}>Investment Amount</label>
+                <span style={{ color: "#fff", fontFamily: "monospace", fontSize: "0.875rem" }}>${simAmount.toLocaleString()}</span>
+              </div>
+              <input type="range" min="100" max="50000" step="100" value={simAmount} onChange={(e) => setSimAmount(Number(e.target.value))} style={{ width: "100%", accentColor: "#0266ff", height: "4px" }} />
+            </div>
+
+            {/* APY */}
+            <div style={{ marginBottom: "1.5rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                <label style={{ fontSize: "12px", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)" }}>APY</label>
+                <span style={{ color: "#fff", fontFamily: "monospace", fontSize: "0.875rem" }}>{simApy}%</span>
+              </div>
+              <input type="range" min="5" max="20" step="0.5" value={simApy} onChange={(e) => setSimApy(Number(e.target.value))} style={{ width: "100%", accentColor: "#0266ff", height: "4px" }} />
+            </div>
+
+            {/* Duration */}
+            <div style={{ marginBottom: "2rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                <label style={{ fontSize: "12px", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)" }}>Duration</label>
+                <span style={{ color: "#fff", fontFamily: "monospace", fontSize: "0.875rem" }}>{simDuration} days</span>
+              </div>
+              <input type="range" min="30" max="365" step="1" value={simDuration} onChange={(e) => setSimDuration(Number(e.target.value))} style={{ width: "100%", accentColor: "#0266ff", height: "4px" }} />
+            </div>
+
+            {/* Results */}
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "1rem", marginBottom: "1.5rem" }}>
+              <div style={{ background: "rgba(255,255,255,0.05)", padding: "1rem", borderRadius: "0.75rem", border: "1px solid rgba(255,255,255,0.05)" }}>
+                <p style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", marginBottom: "0.25rem" }}>Estimated Return</p>
+                <p style={{ fontSize: "1.5rem", fontWeight: 600, color: "#0266ff", fontFamily: "monospace", letterSpacing: "-0.02em" }}>+${simReturn.toFixed(2)}</p>
+              </div>
+              <div style={{ background: "rgba(255,255,255,0.05)", padding: "1rem", borderRadius: "0.75rem", border: "1px solid rgba(255,255,255,0.05)" }}>
+                <p style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", marginBottom: "0.25rem" }}>Total Received</p>
+                <p style={{ fontSize: "1.5rem", fontWeight: 600, color: "#fff", fontFamily: "monospace", letterSpacing: "-0.02em" }}>${simTotal.toFixed(2)}</p>
+              </div>
+            </div>
+
+            {/* Mock Testnet Preview */}
+            <div style={{ padding: "1rem", background: "rgba(2,102,255,0.08)", border: "1px solid rgba(2,102,255,0.2)", borderRadius: "0.5rem", marginBottom: "1.5rem", fontSize: "0.8125rem", color: "rgba(255,255,255,0.7)" }}>
+              <p style={{ fontWeight: 600, color: "#0266ff", marginBottom: "0.25rem" }}>Stellar Testnet Preview</p>
+              <p>Send {(simAmount / 500).toFixed(1)} XLM → Escrow → Receive {(simTotal / 500).toFixed(1)} XLM after {simDuration} days</p>
+            </div>
+
+            <button onClick={() => setSimOpen(false)} style={{ width: "100%", padding: "0.75rem", background: "#fff", color: "#000", border: "none", borderRadius: "0.5rem", fontWeight: 700, fontSize: "0.875rem", cursor: "pointer", fontFamily: "Inter, sans-serif" }}>
+              Close Simulator
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

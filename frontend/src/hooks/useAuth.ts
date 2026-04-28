@@ -75,7 +75,7 @@ export function useAuth() {
 
       try {
         // Check if Freighter is available
-        if (!window.freighter) {
+        if (!(window as any).freighter) {
           throw new Error("Freighter wallet not found. Please install the Freighter extension.");
         }
 
@@ -83,7 +83,7 @@ export function useAuth() {
         const nonce = await getChallenge(address);
 
         // Sign with Freighter
-        const signResponse = await window.freighter.signMessage(
+        const signResponse = await (window as any).freighter.signMessage(
           {
             message: nonce,
           },
@@ -162,17 +162,6 @@ export function useAuth() {
   };
 }
 
-// Type augmentation for Freighter API
-declare global {
-  interface Window {
-    freighter?: {
-      signMessage(
-        params: {
-          message: string;
-        },
-        options: { address: string }
-      ): Promise<string>;
-      getPublicKey(): Promise<string>;
-    };
-  }
-}
+
+
+

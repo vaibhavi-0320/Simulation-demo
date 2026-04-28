@@ -3,6 +3,7 @@ import path from "path";
 import { defineConfig } from "vite";
 
 const projectRoot = path.resolve(process.cwd());
+const PORT = Number(process.env.PORT || process.env.APP_PORT || 3000);
 
 export default defineConfig({
   plugins: [react({
@@ -18,10 +19,16 @@ export default defineConfig({
     hmr: {
       protocol: 'ws',
       host: '127.0.0.1',
-      port: 5173,
+      port: PORT,
     },
-    port: 5173,
+    port: PORT,
     host: '127.0.0.1',
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:3000',
+        changeOrigin: true,
+      },
+    },
   },
   build: {
     outDir: 'dist',

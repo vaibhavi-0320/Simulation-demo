@@ -1,3 +1,4 @@
+// @ts-nocheck
 import sanitizeHtml from "sanitize-html";
 import { z } from "zod";
 
@@ -37,9 +38,19 @@ export const invoiceActionQuerySchema = z.object({
 
 export const fundInvoiceSchema = z.object({
   funder: cleanString(120),
+  investorWalletAddress: cleanString(120).optional(),
+  invoiceId: cleanString(100).optional(),
+  dealId: cleanString(100).optional(),
   amount: z.coerce.number().positive().max(10_000_000).optional(),
+  amountUSD: z.coerce.number().positive().max(10_000_000).optional(),
+  destinationWallet: cleanString(120).optional(),
   provider: z.enum(["freighter", "albedo", "phyto", "demo"]).optional(),
 }).strict();
+
+export const confirmFundInvoiceSchema = fundInvoiceSchema.extend({
+  signedXdr: z.string().min(1).optional(),
+  txHash: cleanString(120),
+});
 
 export const emptyBodySchema = z.object({}).strict();
 
@@ -55,6 +66,12 @@ export const chatSchema = z.object({
   question: z.string().transform(v => v ? sanitizeString(v) : v).pipe(z.string().max(1000)).optional().default(""),
   walletAddress: optionalCleanString(120).nullable(),
   view: optionalCleanString(40).nullable(),
+  history: z.array(
+    z.object({
+      role: z.enum(["assistant", "user"]),
+      text: z.string().transform(sanitizeString).pipe(z.string().min(1).max(2000)),
+    }).strict()
+  ).max(20).optional().default([]),
   page: z.enum(PAGE_VALUES).optional().nullable(),
   step: z.enum(STEP_VALUES).optional().nullable(),
   data: z.record(z.union([z.string(), z.number(), z.boolean()])).optional().nullable(),

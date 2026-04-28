@@ -14,5 +14,10 @@
   "engines": {
     "node": ">=20.0.0",
     "npm": ">=10.0.0"
+  },
+  "dependencies": {
+    "@clerk/express": "^2.1.9",
+    "@stellar/stellar-sdk": "^15.0.1",
+    "stellar-sdk": "^11.2.2"
   }
 }

@@ -1,4 +1,4 @@
-import { createInvoice, jsonError, listInvoices } from "../backend/service";
+import { createInvoice, jsonError, listInvoices } from "../../backend/service";
 
 export default function handler(req: any, res: any) {
   if (req.method === "GET") {

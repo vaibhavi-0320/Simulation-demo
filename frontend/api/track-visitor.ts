@@ -1,4 +1,4 @@
-import { jsonError, trackVisitor } from "../backend/service";
+import { jsonError, trackVisitor } from "../../backend/service";
 
 export default function handler(req: any, res: any) {
   if (req.method === "POST") {

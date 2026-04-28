@@ -14,6 +14,9 @@ export interface InvoiceRecord {
   tags: string[];
   riskScore: number;
   aiSummary: string;
+  txHash?: string;
+  escrowWallet?: string;
+  fundingWallet?: string;
 }
 
 export interface TransactionRecord {

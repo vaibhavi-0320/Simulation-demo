@@ -17,7 +17,7 @@ export function useWallet() {
 
   // Check if Freighter is available
   const isFreighterAvailable = () => {
-    return typeof window !== "undefined" && window.freighter;
+    return typeof window !== "undefined" && (window as any).freighter;
   };
 
   // Connect wallet
@@ -34,7 +34,7 @@ export function useWallet() {
     setStatus((prev) => ({ ...prev, state: "connecting", error: null }));
 
     try {
-      const publicKey = await window.freighter.getPublicKey();
+      const publicKey = await (window as any).freighter.getPublicKey();
       setStatus({
         state: "connected",
         address: publicKey,
@@ -58,7 +58,7 @@ export function useWallet() {
     setStatus((prev) => ({ ...prev, state: "signing" }));
 
     try {
-      const signature = await window.freighter.signMessage({ message }, { address: status.address });
+      const signature = await (window as any).freighter.signMessage({ message }, { address: status.address });
       setStatus((prev) => ({ ...prev, state: "connected" }));
       return signature;
     } catch (error) {
@@ -89,13 +89,13 @@ export function useWallet() {
     };
 
     // Listen for wallet disconnect events (if supported by Freighter)
-    if (window.freighter && window.freighter.onDisconnect) {
-      window.freighter.onDisconnect(handleDisconnect);
+    if ((window as any).freighter && (window as any).freighter.onDisconnect) {
+      (window as any).freighter.onDisconnect(handleDisconnect);
     }
 
     return () => {
-      if (window.freighter && window.freighter.offDisconnect) {
-        window.freighter.offDisconnect(handleDisconnect);
+      if ((window as any).freighter && (window as any).freighter.offDisconnect) {
+        (window as any).freighter.offDisconnect(handleDisconnect);
       }
     };
   }, [status.state]);
@@ -109,17 +109,6 @@ export function useWallet() {
   };
 }
 
-// Type augmentation for Freighter API
-declare global {
-  interface Window {
-    freighter?: {
-      getPublicKey(): Promise<string>;
-      signMessage(
-        params: { message: string },
-        options: { address: string }
-      ): Promise<string>;
-      onDisconnect?(callback: () => void): void;
-      offDisconnect?(callback: () => void): void;
-    };
-  }
-}
+
+
+
