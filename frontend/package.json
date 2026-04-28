@@ -20,6 +20,7 @@
         "@react-three/postprocessing": "^3.0.4",
         "@sentry/node": "^10.50.0",
         "@stellar/freighter-api": "^6.0.1",
+        "@stellar/stellar-sdk": "^15.0.1",
         "@supabase/supabase-js": "^2.104.1",
         "@types/jsonwebtoken": "^9.0.10",
         "@types/sanitize-html": "^2.16.1",
