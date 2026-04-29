@@ -219,22 +219,47 @@ export async function fundInvoice(
 
   const { xdr } = buildData;
 
+  // Before signing — verify XDR is valid
+  if (!xdr || typeof xdr !== 'string' || xdr.length < 100) {
+    throw new Error(
+      `Invalid XDR received from server: "${String(xdr).substring(0, 50)}". ` +
+      `This usually means the API call failed and returned HTML instead of JSON.`
+    );
+  }
+
   let signedXdr: string;
   try {
     const signResult = await signTransaction(xdr, {
       networkPassphrase: PASSPHRASE,
     });
-    signedXdr = (signResult as any).signedTxXdr;
+
+    // Handle all possible Freighter response shapes
+    signedXdr = (signResult as any)?.signedTxXdr 
+      || (signResult as any)?.xdr
+      || (signResult as any)?.signed_envelope_xdr
+      || (typeof signResult === 'string' ? signResult : '');
+
+    if (!signedXdr || signedXdr.length < 100) {
+      throw new Error(
+        'Freighter returned empty signed transaction. ' +
+        'Make sure Freighter is unlocked, set to Testnet network, ' +
+        'and you approved the transaction popup.'
+      );
+    }
   } catch (error: any) {
     const msg = error?.message || String(error);
     if (msg.toLowerCase().includes("decli") || msg.toLowerCase().includes("reject") || msg.toLowerCase().includes("cancel")) {
       throw new Error("You cancelled the transaction in Freighter.");
     }
+    if (msg.includes('empty') || msg.includes('undefined')) {
+      throw new Error(
+        'Freighter did not return a signed transaction. ' +
+        'Check that: 1) Freighter is set to TESTNET network, ' +
+        '2) You clicked Approve (not Decline), ' +
+        '3) Your wallet has enough XLM for fees.'
+      );
+    }
     throw new Error(`Freighter signing error: ${msg}`);
-  }
-
-  if (!signedXdr) {
-    throw new Error("Freighter returned empty signed transaction.");
   }
 
   const submitRes = await fetch(`${API}${buildMainApiUrl("stellar-submit")}`, {
@@ -324,16 +349,45 @@ export async function simulateOnTestnet(
 
   const { xdr } = buildData;
 
+  // Before signing — verify XDR is valid
+  if (!xdr || typeof xdr !== 'string' || xdr.length < 100) {
+    throw new Error(
+      `Invalid XDR received from server: "${String(xdr).substring(0, 50)}". ` +
+      `This usually means the API call failed and returned HTML instead of JSON.`
+    );
+  }
+
   let signedXdr: string;
   try {
     const signResult = await signTransaction(xdr, {
       networkPassphrase: PASSPHRASE,
     });
-    signedXdr = (signResult as any).signedTxXdr;
+
+    // Handle all possible Freighter response shapes
+    signedXdr = (signResult as any)?.signedTxXdr 
+      || (signResult as any)?.xdr
+      || (signResult as any)?.signed_envelope_xdr
+      || (typeof signResult === 'string' ? signResult : '');
+
+    if (!signedXdr || signedXdr.length < 100) {
+      throw new Error(
+        'Freighter returned empty signed transaction. ' +
+        'Make sure Freighter is unlocked, set to Testnet network, ' +
+        'and you approved the transaction popup.'
+      );
+    }
   } catch (error: any) {
     const msg = error?.message || String(error);
     if (msg.toLowerCase().includes("decli") || msg.toLowerCase().includes("cancel") || msg.toLowerCase().includes("reject")) {
       throw new Error("Simulation cancelled in Freighter.");
+    }
+    if (msg.includes('empty') || msg.includes('undefined')) {
+      throw new Error(
+        'Freighter did not return a signed transaction. ' +
+        'Check that: 1) Freighter is set to TESTNET network, ' +
+        '2) You clicked Approve (not Decline), ' +
+        '3) Your wallet has at least 2 XLM for fees.'
+      );
     }
     throw new Error(`Freighter signing failed: ${msg}`);
   }
@@ -347,6 +401,14 @@ export async function simulateOnTestnet(
   const submitData = await submitRes.json();
   if (!submitRes.ok) {
     throw new Error(submitData.error || "Simulation submission failed");
+  }
+
+  // CHECK THAT txHash EXISTS before calling substring()
+  if (!submitData.txHash || typeof submitData.txHash !== 'string') {
+    throw new Error(
+      'Simulation was submitted but server returned invalid transaction hash. ' +
+      'This is a server error. Please try again.'
+    );
   }
 
   const realSimId = `SIM-${submitData.txHash.substring(0, 8).toUpperCase()}`;
