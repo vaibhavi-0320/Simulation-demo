@@ -48,16 +48,17 @@ export default async function handler(
   let account: any;
   try {
     account = await HORIZON.loadAccount(investorPublicKey);
-  } catch (e: any) {
-    if (e?.response?.status === 404) {
+  } catch (err: any) {
+    console.error("API ERROR:", err);
+    if (err?.response?.status === 404) {
       return res.status(400).json({
         error:
           'Wallet not activated on testnet. Fund at: ' +
           'https://laboratory.stellar.org/#account-creator?network=test',
       });
     }
-    return res.status(400).json({
-      error: `Failed to load account: ${e.message}`,
+    return res.status(500).json({
+      error: err.message || "Unknown error"
     });
   }
 
@@ -73,9 +74,10 @@ export default async function handler(
 
   try {
     await HORIZON.loadAccount(ESCROW);
-  } catch {
-    return res.status(400).json({
-      error: `Escrow account not found on testnet: ${ESCROW}`,
+  } catch (err: any) {
+    console.error("API ERROR:", err);
+    return res.status(500).json({
+      error: err.message || "Unknown error"
     });
   }
 
@@ -103,7 +105,10 @@ export default async function handler(
       xlmAmount,
       destination: ESCROW,
     });
-  } catch (e: any) {
-    return res.status(500).json({ error: `XDR build failed: ${e.message}` });
+  } catch (err: any) {
+    console.error("API ERROR:", err);
+    return res.status(500).json({
+      error: err.message || "Unknown error"
+    });
   }
 }

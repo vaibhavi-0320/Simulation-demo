@@ -376,6 +376,48 @@ async function startServer() {
     }
   });
 
+  app.post('/api/invoices/:id/fund', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { amount, funderWallet } = req.body;
+      
+      if (!amount || amount <= 0) {
+        return res.status(400).json({ success: false, error: 'Invalid amount' });
+      }
+      
+      const storeState = (await import("../backend/store.ts")).getStore();
+      const invoice = storeState.invoices.find(inv => inv.id === id);
+      
+      if (!invoice) {
+        return res.status(404).json({ success: false, error: 'Invoice not found' });
+      }
+      
+      if (funderWallet && funderWallet === invoice.funder) {
+        return res.status(400).json({ success: false, error: 'Cannot fund your own invoice' });
+      }
+      
+      // Update funded amount
+      invoice.funded = (invoice.funded || 0) + Number(amount);
+      invoice.status = invoice.funded >= invoice.amount ? 'funded' : 'active';
+      invoice.funder = funderWallet;
+      
+      (await import("../backend/store.ts")).persistStore();
+      
+      return res.status(200).json({ 
+        success: true, 
+        data: invoice,
+        message: 'Investment confirmed successfully'
+      });
+      
+    } catch (error: any) {
+      console.error('Fund invoice error:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: error.message || 'Internal server error' 
+      });
+    }
+  });
+
   app.post("/api/invoice/upload", async (req, res, next) => {
     try {
       const body = validation.invoiceCreateSchema.parse(req.body) as Parameters<typeof service.createInvoice>[0];

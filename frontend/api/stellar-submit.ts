@@ -30,17 +30,25 @@ export default async function handler(
   try {
     const tx = StellarSdk.TransactionBuilder.fromXDR(signedXdr, PASSPHRASE);
     const result = await HORIZON.submitTransaction(tx);
+
+    console.log("Submit response:", result);
+
+    if (!result || !result.hash) {
+      return res.status(500).json({
+        error: "Transaction failed",
+        details: result
+      });
+    }
+
     return res.status(200).json({
       success: true,
       txHash: result.hash,
       explorerUrl: `https://stellar.expert/explorer/testnet/tx/${result.hash}`,
     });
-  } catch (e: any) {
-    const codes = e?.response?.data?.extras?.result_codes;
-    return res.status(400).json({
-      error: codes
-        ? `Stellar rejected: ${JSON.stringify(codes)}`
-        : `Submit failed: ${e.message}`,
+  } catch (err: any) {
+    console.error("API ERROR:", err);
+    return res.status(500).json({
+      error: err.message || "Unknown error"
     });
   }
 }

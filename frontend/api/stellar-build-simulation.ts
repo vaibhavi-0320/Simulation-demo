@@ -28,14 +28,15 @@ export default async function handler(
   let account: any;
   try {
     account = await HORIZON.loadAccount(investorPublicKey);
-  } catch (e: any) {
-    if (e?.response?.status === 404) {
+  } catch (err: any) {
+    console.error("API ERROR:", err);
+    if (err?.response?.status === 404) {
       return res.status(400).json({
         error: 'Wallet not activated on testnet. Fund at Friendbot.',
       });
     }
-    return res.status(400).json({
-      error: `Account load failed: ${e.message}`,
+    return res.status(500).json({
+      error: err.message || "Unknown error"
     });
   }
 
@@ -67,7 +68,10 @@ export default async function handler(
       .build();
 
     return res.status(200).json({ xdr: tx.toXDR(), memo: memoText });
-  } catch (e: any) {
-    return res.status(500).json({ error: `Build failed: ${e.message}` });
+  } catch (err: any) {
+    console.error("API ERROR:", err);
+    return res.status(500).json({
+      error: err.message || "Unknown error"
+    });
   }
 }

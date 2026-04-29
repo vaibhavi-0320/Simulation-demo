@@ -249,6 +249,8 @@ export async function fundInvoice(
     );
   }
 
+  console.log("XDR before signing:", xdr);
+
   let signedXdr: string;
   try {
     const signResult = await signTransaction(xdr, {
@@ -261,12 +263,10 @@ export async function fundInvoice(
       || (signResult as any)?.signed_envelope_xdr
       || (typeof signResult === 'string' ? signResult : '');
 
-    if (!signedXdr || signedXdr.length < 100) {
-      throw new Error(
-        'Freighter returned empty signed transaction. ' +
-        'Make sure Freighter is unlocked, set to Testnet network, ' +
-        'and you approved the transaction popup.'
-      );
+    console.log("Signed XDR:", signedXdr);
+
+    if (!signedXdr || typeof signedXdr !== 'string' || signedXdr.trim() === "") {
+      throw new Error("Freighter returned empty signed transaction");
     }
   } catch (error: any) {
     const msg = error?.message || String(error);
@@ -299,9 +299,9 @@ export async function fundInvoice(
 
   // Ensure txHash exists before using
   const txRaw = submitData?.txHash || submitData?.hash || null;
-  if (!txRaw || typeof txRaw !== 'string') {
-    throw new Error('Submit succeeded but response missing transaction hash. ' +
-      `Full response: ${JSON.stringify(submitData).substring(0, 300)}`);
+  if (!txRaw || typeof txRaw !== "string") {
+    console.error("Invalid txHash:", txRaw);
+    throw new Error("Transaction failed: invalid txHash");
   }
 
   try {
@@ -375,6 +375,8 @@ export async function simulateOnTestnet(
     );
   }
 
+  console.log("XDR before signing:", xdr);
+
   let signedXdr: string;
   try {
     const signResult = await signTransaction(xdr, {
@@ -387,12 +389,10 @@ export async function simulateOnTestnet(
       || (signResult as any)?.signed_envelope_xdr
       || (typeof signResult === 'string' ? signResult : '');
 
-    if (!signedXdr || signedXdr.length < 100) {
-      throw new Error(
-        'Freighter returned empty signed transaction. ' +
-        'Make sure Freighter is unlocked, set to Testnet network, ' +
-        'and you approved the transaction popup.'
-      );
+    console.log("Signed XDR:", signedXdr);
+
+    if (!signedXdr || typeof signedXdr !== 'string' || signedXdr.trim() === "") {
+      throw new Error("Freighter returned empty signed transaction");
     }
   } catch (error: any) {
     const msg = error?.message || String(error);
@@ -417,12 +417,13 @@ export async function simulateOnTestnet(
   });
 
   const txRaw = submitData?.txHash || submitData?.hash || null;
-  if (!txRaw || typeof txRaw !== 'string') {
-    throw new Error('Simulation submitted but missing transaction hash. ' +
-      `Full response: ${JSON.stringify(submitData).substring(0, 300)}`);
+  if (!txRaw || typeof txRaw !== "string") {
+    console.error("Invalid txHash:", txRaw);
+    throw new Error("Transaction failed: invalid txHash");
   }
 
-  const realSimId = `SIM-${txRaw.substring(0, 8).toUpperCase()}`;
+  const shortHash = txRaw.substring(0, 10);
+  const realSimId = `SIM-${shortHash.toUpperCase()}`;
   const expectedReturn = parseFloat(
     (amountUSD * ((deal.apy || 0) / 100) * ((deal.durationDays || 180) / 365)).toFixed(2)
   );
