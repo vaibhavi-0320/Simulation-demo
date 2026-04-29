@@ -43,17 +43,35 @@ const invoiceStore: any[] = [
 ];
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  const action = req.query.action as string;
-
   try {
+    // 1. Check for required environment variables
+    const requiredEnvVars = [
+      'GEMINI_API_KEY',
+      'SUPABASE_URL',
+      'SUPABASE_ANON_KEY',
+    ];
+
+    for (const envVar of requiredEnvVars) {
+      if (!process.env[envVar]) {
+        return res.status(500).json({
+          error: `Missing environment variable: ${envVar}`,
+          fix: 'Add this variable in Vercel Dashboard > Settings > Environment Variables',
+          action: req.query?.action || 'init'
+        });
+      }
+    }
+
+    // 2. Set CORS headers
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+
+    const action = req.query.action as string;
+
     if (action === 'get-invoices' || action === 'ste-build-simulation') {
       return res.status(200).json({ success: true, data: invoiceStore });
     }
@@ -119,6 +137,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ success: true, data: invoiceStore });
 
   } catch (error: any) {
-    return res.status(500).json({ success: false, error: error.message });
+    console.error('[API ERROR]', error);
+    // CRITICAL: always return JSON, never plain text
+    return res.status(500).json({
+      error: 'Internal server error',
+      message: error?.message || 'Unknown error',
+      action: req.query?.action || 'unknown'
+    });
   }
 }
