@@ -1,7 +1,7 @@
 import { VercelRequest, VercelResponse } from "@vercel/node";
 import { getBackendModules } from "./handlers";
 
-export async function withAuthMiddleware(
+export function withAuthMiddleware(
   handler: (req: VercelRequest, res: VercelResponse) => Promise<void>
 ) {
   return async (req: VercelRequest, res: VercelResponse) => {

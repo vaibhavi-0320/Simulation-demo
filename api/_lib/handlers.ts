@@ -43,7 +43,7 @@ export function errorResponse(res: VercelResponse, message: string, status = 400
   res.status(status).json({ error: message });
 }
 
-export async function withErrorHandling(
+export function withErrorHandling(
   handler: (req: VercelRequest, res: VercelResponse) => Promise<void>
 ) {
   return async (req: VercelRequest, res: VercelResponse) => {

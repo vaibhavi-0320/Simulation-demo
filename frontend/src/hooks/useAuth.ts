@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { buildMainApiUrl } from "../services/mainApi";
 
 interface AuthState {
   jwt: string | null;
@@ -31,7 +32,7 @@ export function useAuth() {
    * Request a challenge nonce from the backend
    */
   const getChallenge = useCallback(async (address: string): Promise<string> => {
-    const response = await fetch("/api/auth/challenge", {
+    const response = await fetch(buildMainApiUrl("auth-challenge"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ address }),
@@ -50,7 +51,7 @@ export function useAuth() {
    */
   const verifySignature = useCallback(
     async (address: string, signature: string, nonce: string): Promise<string> => {
-      const response = await fetch("/api/auth/verify", {
+      const response = await fetch(buildMainApiUrl("auth-verify"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ address, signature, nonce }),

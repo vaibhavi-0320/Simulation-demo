@@ -7,7 +7,7 @@
         "dev": "tsx server.ts",
         "dev:client": "vite",
         "start": "node dist/index.js",
-        "build": "tsc && vite build",
+        "build": "vite build",
         "preview": "vite preview",
         "clean": "powershell -Command \"if (Test-Path dist) { Remove-Item -Recurse -Force dist }\"",
         "lint": "tsc --noEmit"

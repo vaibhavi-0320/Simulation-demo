@@ -2,5 +2,25 @@
   "buildCommand": "cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
   "installCommand": "cd frontend && npm install",
-  "framework": "vite"
+  "framework": "vite",
+  "rewrites": [
+    { "source": "/api/health", "destination": "/api/main?action=health" },
+    { "source": "/api/transactions", "destination": "/api/main?action=transactions" },
+    { "source": "/api/visitors", "destination": "/api/main?action=visitors" },
+    { "source": "/api/track-visitor", "destination": "/api/main?action=track-visitor" },
+    { "source": "/api/invoices", "destination": "/api/main?action=invoices" },
+    { "source": "/api/invoice/all", "destination": "/api/main?action=invoice-all" },
+    { "source": "/api/invoice/list", "destination": "/api/main?action=invoice-list" },
+    { "source": "/api/invoice/upload", "destination": "/api/main?action=invoice-upload" },
+    { "source": "/api/invoice-action", "destination": "/api/main?action=invoice-action" },
+    { "source": "/api/portfolio/:walletAddress", "destination": "/api/main?action=portfolio&walletAddress=:walletAddress" },
+    { "source": "/api/ai-parse", "destination": "/api/main?action=ai-parse" },
+    { "source": "/api/chat", "destination": "/api/main?action=chat" },
+    { "source": "/api/auth/challenge", "destination": "/api/main?action=auth-challenge" },
+    { "source": "/api/auth/verify", "destination": "/api/main?action=auth-verify" },
+    { "source": "/api/stellar/health", "destination": "/api/main?action=stellar-health" },
+    { "source": "/api/stellar/build", "destination": "/api/main?action=stellar-build" },
+    { "source": "/api/stellar/submit", "destination": "/api/main?action=stellar-submit" },
+    { "source": "/api/stellar/build-simulation", "destination": "/api/main?action=stellar-build-simulation" }
+  ]
 }

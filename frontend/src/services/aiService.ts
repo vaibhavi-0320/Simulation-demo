@@ -1,4 +1,5 @@
 import { InvoiceParseResult } from "../types";
+import { buildMainApiUrl } from "./mainApi";
 
 export interface AssistantHistoryMessage {
   role: "assistant" | "user";
@@ -59,7 +60,7 @@ function fallbackParse(fileBase64: string): InvoiceParseResult {
 
 export async function parseInvoiceWithAI(fileBase64: string, mimeType: string) {
   try {
-    const response = await fetch("/api/ai-parse", {
+    const response = await fetch(buildMainApiUrl("ai-parse"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ fileBase64, mimeType }),
@@ -83,7 +84,7 @@ export async function askFintrixAssistant(input: {
   history?: AssistantHistoryMessage[];
 }) {
   try {
-    const response = await fetch("/api/chat", {
+    const response = await fetch(buildMainApiUrl("chat"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

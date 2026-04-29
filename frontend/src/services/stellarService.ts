@@ -2,6 +2,7 @@ import * as StellarSdk from "stellar-sdk";
 import { getAddress, getNetworkDetails, isAllowed, isConnected, requestAccess, signTransaction } from "@stellar/freighter-api";
 import { ConnectedWallet, Invoice, Transaction, WalletProvider } from "../types";
 import { getUserStorageKey, safeStorage } from "../utils/storage";
+import { buildMainApiUrl } from "./mainApi";
 
 const HORIZON_URL = "https://horizon-testnet.stellar.org";
 const PASSPHRASE = "Test SDF Network ; September 2015";
@@ -200,7 +201,7 @@ export async function fundInvoice(
     throw new Error(`Invalid wallet address from Freighter: "${investorPublicKey}"`);
   }
 
-  const buildRes = await fetch(`${API}/api/stellar/build`, {
+  const buildRes = await fetch(`${API}${buildMainApiUrl("stellar-build")}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -236,7 +237,7 @@ export async function fundInvoice(
     throw new Error("Freighter returned empty signed transaction.");
   }
 
-  const submitRes = await fetch(`${API}/api/stellar/submit`, {
+  const submitRes = await fetch(`${API}${buildMainApiUrl("stellar-submit")}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -305,7 +306,7 @@ export async function simulateOnTestnet(
     throw new Error("Invalid wallet address from Freighter.");
   }
 
-  const buildRes = await fetch(`${API}/api/stellar/build-simulation`, {
+  const buildRes = await fetch(`${API}${buildMainApiUrl("stellar-build-simulation")}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -337,7 +338,7 @@ export async function simulateOnTestnet(
     throw new Error(`Freighter signing failed: ${msg}`);
   }
 
-  const submitRes = await fetch(`${API}/api/stellar/submit`, {
+  const submitRes = await fetch(`${API}${buildMainApiUrl("stellar-submit")}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ signedXdr, invoiceId: deal.id, amountUSD }),
