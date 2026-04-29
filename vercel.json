@@ -2,26 +2,27 @@
   "version": 2,
   "buildCommand": "cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
-  "installCommand": "cd frontend && npm install",
-  "framework": "vite",
-  "builds": [
-    {
-      "src": "frontend/package.json",
-      "use": "@vercel/static-build",
-      "config": { "distDir": "frontend/dist" }
-    },
-    {
-      "src": "frontend/api/*.ts",
-      "use": "@vercel/node"
+  "functions": {
+    "frontend/api/*.ts": {
+      "runtime": "@vercel/node@3.0.0"
     }
-  ],
-  "routes": [
-    { "src": "/api/stellar/build", "dest": "/frontend/api/stellar-build.ts" },
-    { "src": "/api/stellar/submit", "dest": "/frontend/api/stellar-submit.ts" },
+  },
+  "rewrites": [
     {
-      "src": "/api/stellar/build-simulation",
-      "dest": "/frontend/api/stellar-build-simulation.ts"
+      "source": "/api/stellar/build",
+      "destination": "/frontend/api/stellar-build"
     },
-    { "src": "/(.*)", "dest": "/frontend/dist/$1" }
+    {
+      "source": "/api/stellar/submit",
+      "destination": "/frontend/api/stellar-submit"
+    },
+    {
+      "source": "/api/stellar/build-simulation",
+      "destination": "/frontend/api/stellar-build-simulation"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
   ]
 }

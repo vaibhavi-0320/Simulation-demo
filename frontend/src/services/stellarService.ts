@@ -2,12 +2,40 @@ import * as StellarSdk from "stellar-sdk";
 import { getAddress, getNetworkDetails, isAllowed, isConnected, requestAccess, signTransaction } from "@stellar/freighter-api";
 import { ConnectedWallet, Invoice, Transaction, WalletProvider } from "../types";
 import { getUserStorageKey, safeStorage } from "../utils/storage";
-import { buildMainApiUrl } from "./mainApi";
 
 const HORIZON_URL = "https://horizon-testnet.stellar.org";
 const PASSPHRASE = "Test SDF Network ; September 2015";
 const API = import.meta.env.VITE_API_BASE || "";
 const horizonServer = new StellarSdk.Horizon.Server(HORIZON_URL);
+
+/**
+ * Safe fetch wrapper that validates JSON responses and provides clear error messages
+ */
+async function safeFetch(url: string, options: RequestInit) {
+  const res = await fetch(url, options);
+  const contentType = res.headers.get('content-type') || '';
+  
+  if (!contentType.includes('application/json')) {
+    const text = await res.text();
+    throw new Error(
+      `API ${url} returned non-JSON (status ${res.status}). ` +
+      `Serverless function may not be deployed. ` +
+      `Response preview: ${text.substring(0, 150)}`
+    );
+  }
+  
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || `${url} failed: ${res.status}`);
+  }
+  
+  return data;
+}
+
+function apiPath(path: string) {
+  const base = API ? API.replace(/\/$/, '') : '';
+  return base + path;
+}
 
 export function validatePublicKey(publicKey: string) {
   return StellarSdk.StrKey.isValidEd25519PublicKey(publicKey.trim());
@@ -201,21 +229,15 @@ export async function fundInvoice(
     throw new Error(`Invalid wallet address from Freighter: "${investorPublicKey}"`);
   }
 
-  const buildRes = await fetch(`${API}${buildMainApiUrl("stellar-build")}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+  const buildData = await safeFetch(apiPath('/api/stellar/build'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       investorPublicKey,
       amountUSD: Number(amountUSD),
       invoiceId: String(invoiceId),
     }),
   });
-
-  const buildData = await buildRes.json();
-
-  if (!buildRes.ok) {
-    throw new Error(buildData.error || `Build failed with status ${buildRes.status}`);
-  }
 
   const { xdr } = buildData;
 
@@ -262,9 +284,9 @@ export async function fundInvoice(
     throw new Error(`Freighter signing error: ${msg}`);
   }
 
-  const submitRes = await fetch(`${API}${buildMainApiUrl("stellar-submit")}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+  const submitData = await safeFetch(apiPath('/api/stellar/submit'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       signedXdr,
       invoiceId,
@@ -275,15 +297,16 @@ export async function fundInvoice(
     }),
   });
 
-  const submitData = await submitRes.json();
-
-  if (!submitRes.ok) {
-    throw new Error(submitData.error || `Submit failed with status ${submitRes.status}`);
+  // Ensure txHash exists before using
+  const txRaw = submitData?.txHash || submitData?.hash || null;
+  if (!txRaw || typeof txRaw !== 'string') {
+    throw new Error('Submit succeeded but response missing transaction hash. ' +
+      `Full response: ${JSON.stringify(submitData).substring(0, 300)}`);
   }
 
   try {
     const portfolioEntry = {
-      txHash: submitData.txHash,
+      txHash: txRaw,
       explorerUrl: submitData.explorerUrl,
       invoiceId,
       company: deal.company || "Unknown",
@@ -302,7 +325,7 @@ export async function fundInvoice(
       type: "funded",
       label: `Funded ${deal.company || "Unknown"} invoice`,
       amount: `$${Number(amountUSD).toLocaleString()}`,
-      txHash: submitData.txHash,
+      txHash: txRaw,
       timestamp: new Date().toISOString(),
     }, 50);
   } catch {
@@ -311,7 +334,7 @@ export async function fundInvoice(
 
   return {
     success: true,
-    txHash: submitData.txHash,
+    txHash: txRaw,
     explorerUrl: submitData.explorerUrl,
   };
 }
@@ -331,9 +354,9 @@ export async function simulateOnTestnet(
     throw new Error("Invalid wallet address from Freighter.");
   }
 
-  const buildRes = await fetch(`${API}${buildMainApiUrl("stellar-build-simulation")}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+  const buildData = await safeFetch(apiPath('/api/stellar/build-simulation'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       investorPublicKey,
       amountUSD: Number(amountUSD),
@@ -341,11 +364,6 @@ export async function simulateOnTestnet(
       dealId: deal.id,
     }),
   });
-
-  const buildData = await buildRes.json();
-  if (!buildRes.ok) {
-    throw new Error(buildData.error || "Failed to build simulation");
-  }
 
   const { xdr } = buildData;
 
@@ -392,26 +410,19 @@ export async function simulateOnTestnet(
     throw new Error(`Freighter signing failed: ${msg}`);
   }
 
-  const submitRes = await fetch(`${API}${buildMainApiUrl("stellar-submit")}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+  const submitData = await safeFetch(apiPath('/api/stellar/submit'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ signedXdr, invoiceId: deal.id, amountUSD }),
   });
 
-  const submitData = await submitRes.json();
-  if (!submitRes.ok) {
-    throw new Error(submitData.error || "Simulation submission failed");
+  const txRaw = submitData?.txHash || submitData?.hash || null;
+  if (!txRaw || typeof txRaw !== 'string') {
+    throw new Error('Simulation submitted but missing transaction hash. ' +
+      `Full response: ${JSON.stringify(submitData).substring(0, 300)}`);
   }
 
-  // CHECK THAT txHash EXISTS before calling substring()
-  if (!submitData.txHash || typeof submitData.txHash !== 'string') {
-    throw new Error(
-      'Simulation was submitted but server returned invalid transaction hash. ' +
-      'This is a server error. Please try again.'
-    );
-  }
-
-  const realSimId = `SIM-${submitData.txHash.substring(0, 8).toUpperCase()}`;
+  const realSimId = `SIM-${txRaw.substring(0, 8).toUpperCase()}`;
   const expectedReturn = parseFloat(
     (amountUSD * ((deal.apy || 0) / 100) * ((deal.durationDays || 180) / 365)).toFixed(2)
   );
@@ -420,7 +431,7 @@ export async function simulateOnTestnet(
 
   const simRecord = {
     simId: realSimId,
-    txHash: submitData.txHash,
+    txHash: txRaw,
     explorerUrl: submitData.explorerUrl,
     invoiceId: deal.id,
     company: deal.company || "Unknown",

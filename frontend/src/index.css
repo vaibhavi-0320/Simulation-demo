@@ -262,3 +262,24 @@ button:disabled {
 .fintrix-counter-glow {
   text-shadow: 0 0 40px rgba(59, 130, 246, 0.6);
 }
+
+@media (max-width: 640px) {
+  .hero-cta-container {
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .hero-cta-container .hero-cta-button,
+  .hero-cta-container button,
+  .hero-cta-container a {
+    width: 100%;
+    max-width: 280px;
+    margin-inline: auto;
+  }
+
+  .hero-cta-container .hero-cta-button > span {
+    padding: 12px 20px;
+    font-size: 0.9rem;
+  }
+}
