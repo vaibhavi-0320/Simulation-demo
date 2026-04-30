@@ -105,38 +105,14 @@ export default function DealDetailView({ invoice, wallet, onBack, sidebarOpen }:
       const response = await fetch(`/api/invoices/${inv.id}/fund`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: Number(investAmount),
-          funderWallet: wallet,
-          txHash: stellarResult.txHash
-        })
+        body: JSON.stringify({ amount: Number(investAmount), funderWallet: wallet, txHash: stellarResult.txHash })
       });
-
       const text = await response.text();
+      if (!text || text.trim() === '') throw new Error('Server returned empty response');
+      const data = JSON.parse(text);
+      if (!data.success) throw new Error(data.error || 'Funding failed');
 
-      if (!text || text.trim() === '') {
-        setFundSuccess({
-          txHash: stellarResult.txHash,
-          explorerUrl: stellarResult.explorerUrl || `https://stellar.expert/explorer/testnet/tx/${stellarResult.txHash}`
-        });
-        setWalletBalance(await getAccountBalance(wallet));
-        return;
-      }
-
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        setFundSuccess({
-          txHash: stellarResult.txHash,
-          explorerUrl: stellarResult.explorerUrl || `https://stellar.expert/explorer/testnet/tx/${stellarResult.txHash}`
-        });
-        setWalletBalance(await getAccountBalance(wallet));
-        return;
-      }
-
-      if (data.success) {
-        console.log('[FINTRIX] Fund success! txHash:', stellarResult.txHash);
+      console.log('[FINTRIX] Fund success! txHash:', stellarResult.txHash);
         setFundSuccess({
           txHash: stellarResult.txHash,
           explorerUrl: stellarResult.explorerUrl || `https://stellar.expert/explorer/testnet/tx/${stellarResult.txHash}`
