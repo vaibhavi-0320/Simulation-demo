@@ -118,23 +118,23 @@ The platform operates as a full simulation environment — meaning every flow (u
 ## Live Screenshots
 
 ### Landing Page
-![Landing Page](Screenshots/landing.png)
+![Landing Page](Screenshots/Landing-Page.png)
 > *Cinematic space-themed hero. Clean navigation. Two clear CTAs: Start Simulation and See How It Works.*
 
 ### Dashboard
 ![Dashboard](Screenshots/Dashboard.png)
 > *Full portfolio view with live XLM balance, total invested, active deals, simulations run, and estimated return — all wired to the connected Stellar wallet.*
 
-### Invoice Upload — Simulation Step 1
-![Upload Invoice](Screenshots/simulation-upload.png)
+### Invoice Upload 
+![Upload Invoice](Screenshots/Invoice-Upload.png)
 > *Drag-and-drop invoice upload with PDF/PNG/JPG support. Right panel shows live system status: OCR complete, data extracted, document ready.*
 
 ### Investment Simulator
-![Simulator](Screenshots/InvestmentSimulator.png)
+![Simulator](Screenshots/Investment-Simulator.png)
 > *Enter investment amount, select deal, and see projected outcome with APY, XLM equivalent, and return intensity bar — all before touching a real wallet.*
 
 ### Marketplace
-![Marketplace](Screenshots/marketplace.png)
+![Marketplace](Screenshots/Marketplace.png)
 > *Browse all open funding opportunities with yield, duration, risk rating, and funding progress.*
 
 ### Deal Detail & Investment Panel
@@ -142,7 +142,7 @@ The platform operates as a full simulation environment — meaning every flow (u
 > *Full deal breakdown: buyer details, cashflow timeline, risk structure, and the Investment Panel to fund the invoice with one click.*
 
 ### Resources & Documentation Center
-![Resources](Screenshots/resources.png)
+![Resources](Screenshots/Resources.png)
 > *In-app documentation: How Simulation Works, Invoice Financing explained, Funding mechanics, Returns & Repayment.*
 
 ---
