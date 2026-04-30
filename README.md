@@ -2,7 +2,7 @@
 
 <br/>
 
-<img src="Screenshots/Banner.png" height="60"/>
+<img src="Screenshots/Banner.png" alt="Invoice Financing on Stellar Blockchain" width="100%"/>
 
 ### AI-Powered Invoice Financing on Stellar Blockchain
 
