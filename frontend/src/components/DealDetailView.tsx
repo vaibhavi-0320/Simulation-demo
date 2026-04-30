@@ -74,16 +74,25 @@ export default function DealDetailView({ invoice, wallet, onBack, sidebarOpen }:
     setFundSuccess(null);
 
     try {
-      // Step 1: Execute real Stellar transaction via Freighter
-      const stellarResult = await fundInvoice(
-        inv.id,
-        Number(investAmount),
-        {
-          company: (inv as any).companyName || inv.buyer,
-          apy: inv.yield,
-          repaymentDate: inv.due,
-        }
-      );
+      console.log('[FINTRIX] Step 1: Calling fundInvoice...', { invoiceId: inv.id, amount: Number(investAmount) });
+
+      // Wrap in a timeout so it never hangs forever
+      const stellarResult = await Promise.race([
+        fundInvoice(
+          inv.id,
+          Number(investAmount),
+          {
+            company: (inv as any).companyName || inv.buyer,
+            apy: inv.yield,
+            repaymentDate: inv.due,
+          }
+        ),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Transaction timed out after 60 seconds. Check your Freighter extension and try again.')), 60000)
+        ),
+      ]);
+
+      console.log('[FINTRIX] Stellar result:', stellarResult);
 
       if (!stellarResult.success || !stellarResult.txHash) {
         setFundError('Stellar transaction failed');
@@ -92,6 +101,7 @@ export default function DealDetailView({ invoice, wallet, onBack, sidebarOpen }:
       }
 
       // Step 2: Update backend with real txHash
+      console.log('[FINTRIX] Step 2: Updating backend with txHash:', stellarResult.txHash);
       const response = await fetch(`/api/invoices/${inv.id}/fund`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -105,7 +115,6 @@ export default function DealDetailView({ invoice, wallet, onBack, sidebarOpen }:
       const text = await response.text();
 
       if (!text || text.trim() === '') {
-        // Backend update failed but Stellar tx succeeded — still show success
         setFundSuccess({
           txHash: stellarResult.txHash,
           explorerUrl: stellarResult.explorerUrl || `https://stellar.expert/explorer/testnet/tx/${stellarResult.txHash}`
@@ -118,7 +127,6 @@ export default function DealDetailView({ invoice, wallet, onBack, sidebarOpen }:
       try {
         data = JSON.parse(text);
       } catch {
-        // JSON parse failed but Stellar tx succeeded
         setFundSuccess({
           txHash: stellarResult.txHash,
           explorerUrl: stellarResult.explorerUrl || `https://stellar.expert/explorer/testnet/tx/${stellarResult.txHash}`
@@ -128,6 +136,7 @@ export default function DealDetailView({ invoice, wallet, onBack, sidebarOpen }:
       }
 
       if (data.success) {
+        console.log('[FINTRIX] Fund success! txHash:', stellarResult.txHash);
         setFundSuccess({
           txHash: stellarResult.txHash,
           explorerUrl: stellarResult.explorerUrl || `https://stellar.expert/explorer/testnet/tx/${stellarResult.txHash}`
@@ -138,6 +147,7 @@ export default function DealDetailView({ invoice, wallet, onBack, sidebarOpen }:
       }
 
     } catch (err: any) {
+      console.error('[FINTRIX] Fund error:', err);
       setFundError(err.message || 'Transaction failed. Please try again.');
     } finally {
       setFundLoading(false);

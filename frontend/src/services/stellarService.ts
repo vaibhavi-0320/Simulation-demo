@@ -12,19 +12,32 @@ const horizonServer = new StellarSdk.Horizon.Server(HORIZON_URL);
  * Safe fetch wrapper that validates JSON responses and provides clear error messages
  */
 async function safeFetch(url: string, options: RequestInit) {
-  const res = await fetch(url, options);
-  const contentType = res.headers.get('content-type') || '';
-  
-  if (!contentType.includes('application/json')) {
-    const text = await res.text();
+  console.log('[FINTRIX safeFetch]', options.method || 'GET', url);
+  let res: Response;
+  try {
+    res = await fetch(url, options);
+  } catch (networkError: any) {
+    console.error('[FINTRIX safeFetch] Network error:', networkError);
+    throw new Error(`Network error calling ${url}: ${networkError.message}. Check if the dev server is running.`);
+  }
+
+  const text = await res.text();
+  console.log('[FINTRIX safeFetch] Status:', res.status, 'Body length:', text.length);
+
+  if (!text || text.trim() === '') {
+    throw new Error(`API ${url} returned empty response (status ${res.status}).`);
+  }
+
+  let data: any;
+  try {
+    data = JSON.parse(text);
+  } catch {
     throw new Error(
       `API ${url} returned non-JSON (status ${res.status}). ` +
-      `Serverless function may not be deployed. ` +
-      `Response preview: ${text.substring(0, 150)}`
+      `Response preview: ${text.substring(0, 200)}`
     );
   }
-  
-  const data = await res.json();
+
   if (!res.ok) {
     throw new Error(data.error || `${url} failed: ${res.status}`);
   }
@@ -217,10 +230,12 @@ export async function fundInvoice(
   amountUSD: number,
   deal: { company?: string; apy?: number; repaymentDate?: string }
 ) {
+  console.log('[FINTRIX fundInvoice] Start — checking Freighter connection...');
   const connected = await isConnected();
   if (!connected || !connected.isConnected) {
     throw new Error('Freighter is not connected. Click "Connect Wallet" first.');
   }
+  console.log('[FINTRIX fundInvoice] Freighter connected. Getting address...');
 
   const addrResult = await getAddress();
   const investorPublicKey = addrResult?.address;
@@ -228,7 +243,9 @@ export async function fundInvoice(
   if (!investorPublicKey || investorPublicKey.length !== 56) {
     throw new Error(`Invalid wallet address from Freighter: "${investorPublicKey}"`);
   }
+  console.log('[FINTRIX fundInvoice] Wallet:', investorPublicKey.substring(0, 10) + '...');
 
+  console.log('[FINTRIX fundInvoice] Building XDR via /api/stellar/build...');
   const buildData = await safeFetch(apiPath('/api/stellar/build'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -249,7 +266,7 @@ export async function fundInvoice(
     );
   }
 
-  console.log("XDR before signing:", xdr);
+  console.log('[FINTRIX fundInvoice] XDR received (length:', xdr.length, '). Opening Freighter for signing...');
 
   let signedXdr: string;
   try {
@@ -263,7 +280,7 @@ export async function fundInvoice(
       || (signResult as any)?.signed_envelope_xdr
       || (typeof signResult === 'string' ? signResult : '');
 
-    console.log("Signed XDR:", signedXdr);
+    console.log('[FINTRIX fundInvoice] Freighter signed! signedXdr length:', signedXdr?.length);
 
     if (!signedXdr || typeof signedXdr !== 'string' || signedXdr.trim() === "") {
       throw new Error("Freighter returned empty signed transaction");
@@ -284,6 +301,7 @@ export async function fundInvoice(
     throw new Error(`Freighter signing error: ${msg}`);
   }
 
+  console.log('[FINTRIX fundInvoice] Submitting signed transaction to Stellar testnet...');
   const submitData = await safeFetch(apiPath('/api/stellar/submit'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -303,6 +321,8 @@ export async function fundInvoice(
     console.error("Invalid txHash:", txRaw);
     throw new Error("Transaction failed: invalid txHash");
   }
+
+  console.log('[FINTRIX fundInvoice] SUCCESS! txHash:', txRaw);
 
   try {
     const portfolioEntry = {

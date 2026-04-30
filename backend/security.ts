@@ -28,7 +28,7 @@ export function configureSecurity(app: Express) {
 
   app.use(pinoHttp({ logger }));
   app.use(helmet({
-    contentSecurityPolicy: {
+    contentSecurityPolicy: env.NODE_ENV === "production" ? {
       useDefaults: true,
       directives: {
         "default-src": ["'self'"],
@@ -39,7 +39,7 @@ export function configureSecurity(app: Express) {
           "https://*.clerk.accounts.dev", 
           "https://*.clerk.com", 
           "https://horizon-testnet.stellar.org",
-          ...(env.NODE_ENV !== "production" ? ["ws://127.0.0.1:*", "ws://localhost:*"] : [])
+          "https://api.stellar.expert",
         ],
         "script-src": ["'self'", "'unsafe-inline'", "https://*.clerk.accounts.dev", "https://*.clerk.com"],
         "style-src": ["'self'", "'unsafe-inline'", "https://api.fontshare.com"],
@@ -47,7 +47,7 @@ export function configureSecurity(app: Express) {
         "img-src": ["'self'", "data:", "blob:", "https:"],
         "media-src": ["'self'", "https://d8j0ntlcm91z4.cloudfront.net"],
       },
-    },
+    } : false,
     crossOriginEmbedderPolicy: false,
     frameguard: { action: "deny" },
     hsts: env.NODE_ENV === "production" ? { maxAge: 31_536_000, includeSubDomains: true } : false,

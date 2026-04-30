@@ -79,10 +79,6 @@ async function startServer() {
   const resolvedPort = await resolveAvailablePort(preferredPort);
   const httpServer = http.createServer(app);
 
-  app.use(helmet({
-    crossOriginEmbedderPolicy: false,
-    contentSecurityPolicy: false,
-  }));
   security.configureSecurity(app);
   app.use(express.json({ limit: "10mb" }));
 
