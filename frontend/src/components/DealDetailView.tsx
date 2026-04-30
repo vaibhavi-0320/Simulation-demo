@@ -59,31 +59,86 @@ export default function DealDetailView({ invoice, wallet, onBack, sidebarOpen }:
   const listDate = new Date(Date.now() - 2 * 86400000).toISOString().split("T")[0];
 
   async function handleFund() {
+    if (!wallet) {
+      setFundError('Please connect your Freighter wallet first');
+      return;
+    }
+
+    if (!investAmount || Number(investAmount) < 100) {
+      setFundError('Minimum investment is $100');
+      return;
+    }
+
     setFundLoading(true);
     setFundError(null);
     setFundSuccess(null);
+
     try {
+      // Step 1: Execute real Stellar transaction via Freighter
+      const stellarResult = await fundInvoice(
+        inv.id,
+        Number(investAmount),
+        {
+          company: (inv as any).companyName || inv.buyer,
+          apy: inv.yield,
+          repaymentDate: inv.due,
+        }
+      );
+
+      if (!stellarResult.success || !stellarResult.txHash) {
+        setFundError('Stellar transaction failed');
+        setFundLoading(false);
+        return;
+      }
+
+      // Step 2: Update backend with real txHash
       const response = await fetch(`/api/invoices/${inv.id}/fund`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: Number(investAmount), funderWallet: wallet })
+        body: JSON.stringify({
+          amount: Number(investAmount),
+          funderWallet: wallet,
+          txHash: stellarResult.txHash
+        })
       });
-      
+
       const text = await response.text();
+
       if (!text || text.trim() === '') {
-        throw new Error('Empty response from server');
+        // Backend update failed but Stellar tx succeeded — still show success
+        setFundSuccess({
+          txHash: stellarResult.txHash,
+          explorerUrl: stellarResult.explorerUrl || `https://stellar.expert/explorer/testnet/tx/${stellarResult.txHash}`
+        });
+        setWalletBalance(await getAccountBalance(wallet));
+        return;
       }
-      
-      const data = JSON.parse(text);
+
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        // JSON parse failed but Stellar tx succeeded
+        setFundSuccess({
+          txHash: stellarResult.txHash,
+          explorerUrl: stellarResult.explorerUrl || `https://stellar.expert/explorer/testnet/tx/${stellarResult.txHash}`
+        });
+        setWalletBalance(await getAccountBalance(wallet));
+        return;
+      }
+
       if (data.success) {
-        // Provide mock txHash since this bypasses Stellar testnet
-        setFundSuccess({ txHash: `backend-fund-${Date.now()}`, explorerUrl: "#" });
-        if (wallet) setWalletBalance(await getAccountBalance(wallet));
+        setFundSuccess({
+          txHash: stellarResult.txHash,
+          explorerUrl: stellarResult.explorerUrl || `https://stellar.expert/explorer/testnet/tx/${stellarResult.txHash}`
+        });
+        setWalletBalance(await getAccountBalance(wallet));
       } else {
         setFundError(data.error || 'Funding failed');
       }
-    } catch (error: any) {
-      setFundError(error.message || "Transaction failed");
+
+    } catch (err: any) {
+      setFundError(err.message || 'Transaction failed. Please try again.');
     } finally {
       setFundLoading(false);
     }

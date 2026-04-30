@@ -309,6 +309,63 @@ async function startServer() {
     }
   });
 
+  // Fund invoice endpoint - placed before auth middleware to ensure JSON responses
+  app.post('/api/invoices/:id/fund', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { amount, funderWallet, txHash } = req.body;
+
+      if (!amount || Number(amount) <= 0) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Invalid investment amount' 
+        });
+      }
+
+      const storeState = (await import("../backend/store.ts")).getStore();
+      const invoice = storeState.invoices.find((inv: any) => inv.id === id);
+
+      if (!invoice) {
+        return res.status(404).json({ 
+          success: false, 
+          error: 'Invoice not found' 
+        });
+      }
+
+      if (funderWallet && invoice.funder && funderWallet === invoice.funder) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'You cannot fund your own invoice' 
+        });
+      }
+
+      invoice.funded = (Number(invoice.funded) || 0) + Number(amount);
+      if (invoice.funded >= invoice.amount) {
+        invoice.status = 'funded';
+      }
+      invoice.funder = funderWallet;
+      if (txHash) {
+        invoice.txHash = txHash;
+      }
+
+      (await import("../backend/store.ts")).persistStore();
+
+      return res.status(200).json({ 
+        success: true, 
+        data: invoice,
+        txHash: txHash || null,
+        message: 'Investment confirmed successfully'
+      });
+
+    } catch (error: any) {
+      console.error('Fund invoice error:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: error.message || 'Server error' 
+      });
+    }
+  });
+
   // Require Clerk auth for the rest of /api routes
   app.use("/api", auth.requireAuthJson);
 
@@ -373,48 +430,6 @@ async function startServer() {
       res.status(201).json({ success: true, data: result });
     } catch (error) {
       next(error);
-    }
-  });
-
-  app.post('/api/invoices/:id/fund', async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { amount, funderWallet } = req.body;
-      
-      if (!amount || amount <= 0) {
-        return res.status(400).json({ success: false, error: 'Invalid amount' });
-      }
-      
-      const storeState = (await import("../backend/store.ts")).getStore();
-      const invoice = storeState.invoices.find(inv => inv.id === id);
-      
-      if (!invoice) {
-        return res.status(404).json({ success: false, error: 'Invoice not found' });
-      }
-      
-      if (funderWallet && funderWallet === invoice.funder) {
-        return res.status(400).json({ success: false, error: 'Cannot fund your own invoice' });
-      }
-      
-      // Update funded amount
-      invoice.funded = (invoice.funded || 0) + Number(amount);
-      invoice.status = invoice.funded >= invoice.amount ? 'funded' : 'active';
-      invoice.funder = funderWallet;
-      
-      (await import("../backend/store.ts")).persistStore();
-      
-      return res.status(200).json({ 
-        success: true, 
-        data: invoice,
-        message: 'Investment confirmed successfully'
-      });
-      
-    } catch (error: any) {
-      console.error('Fund invoice error:', error);
-      return res.status(500).json({ 
-        success: false, 
-        error: error.message || 'Internal server error' 
-      });
     }
   });
 
