@@ -2,27 +2,18 @@
   "version": 2,
   "buildCommand": "cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
-  "functions": {
-    "frontend/api/*.ts": {
-      "runtime": "@vercel/node@3.0.0"
-    }
-  },
+  "installCommand": "cd frontend && npm install",
+  "framework": null,
   "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "headers": [
     {
-      "source": "/api/stellar/build",
-      "destination": "/frontend/api/stellar-build"
-    },
-    {
-      "source": "/api/stellar/submit",
-      "destination": "/frontend/api/stellar-submit"
-    },
-    {
-      "source": "/api/stellar/build-simulation",
-      "destination": "/frontend/api/stellar-build-simulation"
-    },
-    {
-      "source": "/((?!api/).*)",
-      "destination": "/index.html"
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin-allow-popups" },
+        { "key": "Cross-Origin-Embedder-Policy", "value": "unsafe-none" }
+      ]
     }
   ]
 }

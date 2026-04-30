@@ -3,7 +3,7 @@
  * Uses Vite proxy — all /api calls go to localhost:3001 in dev
  */
 
-const API_BASE = import.meta.env.VITE_API_BASE || '/api';
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 interface ApiResponse<T> {
   success: boolean;

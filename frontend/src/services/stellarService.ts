@@ -5,7 +5,7 @@ import { getUserStorageKey, safeStorage } from "../utils/storage";
 
 const HORIZON_URL = "https://horizon-testnet.stellar.org";
 const PASSPHRASE = "Test SDF Network ; September 2015";
-const API = import.meta.env.VITE_API_BASE || "";
+const API = import.meta.env.VITE_API_URL || "";
 const horizonServer = new StellarSdk.Horizon.Server(HORIZON_URL);
 
 /**

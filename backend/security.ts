@@ -28,33 +28,19 @@ export function configureSecurity(app: Express) {
 
   app.use(pinoHttp({ logger }));
   app.use(helmet({
-    contentSecurityPolicy: env.NODE_ENV === "production" ? {
-      useDefaults: true,
-      directives: {
-        "default-src": ["'self'"],
-        "base-uri": ["'self'"],
-        "frame-ancestors": ["'none'"],
-        "connect-src": [
-          "'self'", 
-          "https://*.clerk.accounts.dev", 
-          "https://*.clerk.com", 
-          "https://horizon-testnet.stellar.org",
-          "https://api.stellar.expert",
-        ],
-        "script-src": ["'self'", "'unsafe-inline'", "https://*.clerk.accounts.dev", "https://*.clerk.com"],
-        "style-src": ["'self'", "'unsafe-inline'", "https://api.fontshare.com"],
-        "font-src": ["'self'", "https://api.fontshare.com", "https://cdn.fontshare.com", "data:"],
-        "img-src": ["'self'", "data:", "blob:", "https:"],
-        "media-src": ["'self'", "https://d8j0ntlcm91z4.cloudfront.net"],
-      },
-    } : false,
-    crossOriginResourcePolicy: { policy: "cross-origin" },
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: false,
+    crossOriginOpenerPolicy: false,
     crossOriginEmbedderPolicy: false,
-    frameguard: { action: "deny" },
-    hsts: env.NODE_ENV === "production" ? { maxAge: 31_536_000, includeSubDomains: true } : false,
-    noSniff: true,
-    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+    originAgentCluster: false
   }));
+
+  app.use((req, res, next) => {
+    res.removeHeader('Cross-Origin-Opener-Policy');
+    res.removeHeader('Cross-Origin-Embedder-Policy');
+    res.removeHeader('Cross-Origin-Resource-Policy');
+    next();
+  });
 
   app.use((_req, res, next) => {
     res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()");
@@ -62,20 +48,28 @@ export function configureSecurity(app: Express) {
   });
 
   app.use(cors({
-    credentials: true,
-    origin(origin, callback) {
-      // In development, allow localhost and 127.0.0.1 with any port
-      if (env.NODE_ENV !== "production" && origin && (origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:"))) {
-        callback(null, true);
-        return;
-      }
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-        return;
-      }
-      callback(new Error("CORS origin is not allowed."));
+    origin: (origin, callback) => {
+      const allowed = [
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:3001',
+        'http://127.0.0.1:3002',
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://localhost:3002',
+        /\.vercel\.app$/,  // allows any vercel.app subdomain
+      ];
+      if (!origin) return callback(null, true); // allow server-to-server
+      const isAllowed = allowed.some(a =>
+        typeof a === 'string' ? a === origin : a.test(origin)
+      );
+      callback(null, isAllowed);
     },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key']
   }));
+
+  app.options('*', cors());
 
   if (!(env.NODE_ENV !== "production" && env.SECURITY_RELAXED_LOCAL === "true")) {
     app.use(clerkMiddleware({ authorizedParties: allowedOrigins }));

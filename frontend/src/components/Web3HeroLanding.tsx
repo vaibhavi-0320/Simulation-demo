@@ -971,11 +971,11 @@ export default function Web3HeroLanding({ onLaunch, onStartSimulation, walletCon
                 using Stellar testnet wallets.
               </p>
 
-              <div className="hero-cta-container flex w-full max-w-xs flex-col gap-4 mx-auto items-center sm:flex-row sm:max-w-none">
-                <PillButton tone="light" onClick={handleStartSimulation} className="w-full sm:w-auto max-w-[280px] sm:max-w-none mx-auto hero-cta-button">
+              <div className="hero-cta-container flex w-full flex-col gap-3 mx-auto items-center sm:flex-row sm:justify-center sm:gap-4">
+                <PillButton tone="light" onClick={handleStartSimulation} className="w-full sm:w-auto hero-cta-button">
                   Start Simulation
                 </PillButton>
-                <PillButton tone="ghost" onClick={() => scrollToSection("journey")} className="w-full sm:w-auto max-w-[280px] sm:max-w-none mx-auto hero-cta-button">
+                <PillButton tone="ghost" onClick={() => scrollToSection("journey")} className="w-full sm:w-auto hero-cta-button">
                   See How It Works
                 </PillButton>
               </div>

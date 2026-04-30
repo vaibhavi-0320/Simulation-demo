@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { ArrowLeft, CheckCircle2, ClipboardList, Banknote, CalendarCheck, Lock, Info } from "lucide-react";
-import { fundInvoice, getAccountBalance } from "../services/stellarService";
+import { getAccountBalance } from "../services/stellarService";
+import { checkFreighter, fundInvoiceOnChain } from "../services/stellarTransactions";
 import { useViewport } from "../hooks/useViewport";
 import { SkeletonDeals } from "./PageSkeletons";
 import { usePageSkeleton } from "../hooks/usePageSkeleton";
+
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 interface DealDetailViewProps {
   invoice: {
@@ -74,71 +77,44 @@ export default function DealDetailView({ invoice, wallet, onBack, sidebarOpen }:
     setFundSuccess(null);
 
     try {
-      // Step 1: Execute real Stellar transaction via Freighter
-      const stellarResult = await fundInvoice(
-        inv.id,
-        Number(investAmount),
-        {
-          company: (inv as any).companyName || inv.buyer,
-          apy: inv.yield,
-          repaymentDate: inv.due,
-        }
-      );
+      // Step 1: Verify Freighter is connected
+      const publicKey = await checkFreighter();
 
-      if (!stellarResult.success || !stellarResult.txHash) {
-        setFundError('Stellar transaction failed');
-        setFundLoading(false);
-        return;
-      }
+      // Step 2: Convert USD amount to XLM (rough conversion for testnet)
+      const xlmAmount = (Number(investAmount) / 0.11).toFixed(7);
 
-      // Step 2: Update backend with real txHash
-      const response = await fetch(`/api/invoices/${inv.id}/fund`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: Number(investAmount),
-          funderWallet: wallet,
-          txHash: stellarResult.txHash
-        })
+      // Step 3: Build + sign + submit — Freighter popup opens HERE
+      const result = await fundInvoiceOnChain({
+        funderPublicKey: publicKey,
+        amountXLM: xlmAmount,
+        invoiceId: inv.id,
       });
 
-      const text = await response.text();
-
-      if (!text || text.trim() === '') {
-        // Backend update failed but Stellar tx succeeded — still show success
-        setFundSuccess({
-          txHash: stellarResult.txHash,
-          explorerUrl: stellarResult.explorerUrl || `https://stellar.expert/explorer/testnet/tx/${stellarResult.txHash}`
-        });
-        setWalletBalance(await getAccountBalance(wallet));
-        return;
-      }
-
-      let data;
+      // Step 4: AFTER blockchain success, tell backend to record it (simple POST, no Stellar)
       try {
-        data = JSON.parse(text);
+        await fetch(`${API_BASE}/api/invoices/${inv.id}/fund`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: Number(investAmount),
+            txHash: result.txHash,
+            funderWallet: publicKey,
+          }),
+        });
       } catch {
-        // JSON parse failed but Stellar tx succeeded
-        setFundSuccess({
-          txHash: stellarResult.txHash,
-          explorerUrl: stellarResult.explorerUrl || `https://stellar.expert/explorer/testnet/tx/${stellarResult.txHash}`
-        });
-        setWalletBalance(await getAccountBalance(wallet));
-        return;
+        // Backend update is optional — blockchain tx is the source of truth
       }
 
-      if (data.success) {
-        setFundSuccess({
-          txHash: stellarResult.txHash,
-          explorerUrl: stellarResult.explorerUrl || `https://stellar.expert/explorer/testnet/tx/${stellarResult.txHash}`
-        });
-        setWalletBalance(await getAccountBalance(wallet));
-      } else {
-        setFundError(data.error || 'Funding failed');
-      }
+      // Step 5: Update UI with success
+      setFundSuccess({
+        txHash: result.txHash,
+        explorerUrl: result.explorerUrl,
+      });
+      setWalletBalance(await getAccountBalance(wallet));
 
-    } catch (err: any) {
-      setFundError(err.message || 'Transaction failed. Please try again.');
+    } catch (error: any) {
+      console.error('Transaction failed:', error);
+      setFundError(error.message || 'Transaction failed. Please try again.');
     } finally {
       setFundLoading(false);
     }

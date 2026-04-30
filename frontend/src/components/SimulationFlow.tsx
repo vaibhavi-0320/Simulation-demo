@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Calculator, TrendingUp } from "lucide-react";
 import type { Invoice } from "../types";
-import { simulateOnTestnet } from "../services/stellarService";
+import { checkFreighter, buildSimulationTransaction } from "../services/stellarTransactions";
 import { useViewport } from "../hooks/useViewport";
 import { InvoiceUploader } from "./InvoiceUploader";
 
@@ -109,14 +109,41 @@ export default function SimulationFlow({ invoices, sidebarOpen, walletAddress }:
     setSimError(null);
     setSimResult(null);
     try {
-      const result = await simulateOnTestnet(amount, { id: selectedDeal.id, company: selectedDeal.company, apy: selectedDeal.apy, durationDays, repaymentDate: selectedDeal.repaymentDate });
-      setSimResult(result);
-      
+      // Step 1: Verify Freighter is connected
+      const publicKey = await checkFreighter();
+
+      // Step 2: Convert USD amount to XLM (rough conversion for testnet)
+      const xlmAmount = (amount / 0.11).toFixed(7);
+
+      // Step 3: Build + sign + submit — Freighter popup opens HERE
+      const result = await buildSimulationTransaction({
+        publicKey,
+        amountXLM: xlmAmount,
+        dealId: selectedDeal.id,
+      });
+
+      // Step 4: Format result for display
+      const shortHash = result.txHash.substring(0, 10);
+      const simId = `SIM-${shortHash.toUpperCase()}`;
+      const expectedReturn = parseFloat(
+        (amount * ((selectedDeal.apy || 0) / 100) * (durationDays / 365)).toFixed(2)
+      );
+
+      setSimResult({
+        simId,
+        txHash: result.txHash,
+        explorerUrl: result.explorerUrl,
+        amountUSD: amount,
+        expectedReturn,
+        maturityDate: selectedDeal.repaymentDate,
+      });
+
       // Fix 4: Increment simulations run counter on successful simulation
       const current = parseInt(localStorage.getItem('simulationsRun') || '0', 10);
       localStorage.setItem('simulationsRun', String(current + 1));
-      
+
     } catch (error: any) {
+      console.error('Simulation failed:', error);
       setSimError(error.message || "Simulation failed");
     } finally {
       setSimLoading(false);

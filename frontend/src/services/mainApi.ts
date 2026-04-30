@@ -1,4 +1,5 @@
-const MAIN_API_PATH = "/api/main";
+const API_BASE = import.meta.env.VITE_API_URL || '';
+const MAIN_API_PATH = `${API_BASE}/api/main`;
 
 export function buildMainApiUrl(
   action: string,
