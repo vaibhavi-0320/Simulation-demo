@@ -2,7 +2,7 @@
 
 <br/>
 
-<img src="https://img.shields.io/badge/-%F0%9F%8F%A6%20FINTRIX-000000?style=for-the-badge&logoColor=4fc3f7" height="60"/>
+<img src="Screenshots/Banner.png" height="60"/>
 
 ### AI-Powered Invoice Financing on Stellar Blockchain
 
@@ -122,7 +122,7 @@ The platform operates as a full simulation environment — meaning every flow (u
 > *Cinematic space-themed hero. Clean navigation. Two clear CTAs: Start Simulation and See How It Works.*
 
 ### Dashboard
-![Dashboard](Screenshots/dashboard.png)
+![Dashboard](Screenshots/Dashboard.png)
 > *Full portfolio view with live XLM balance, total invested, active deals, simulations run, and estimated return — all wired to the connected Stellar wallet.*
 
 ### Invoice Upload — Simulation Step 1
@@ -130,7 +130,7 @@ The platform operates as a full simulation environment — meaning every flow (u
 > *Drag-and-drop invoice upload with PDF/PNG/JPG support. Right panel shows live system status: OCR complete, data extracted, document ready.*
 
 ### Investment Simulator
-![Simulator](Screenshots/simulation-returns.png)
+![Simulator](Screenshots/InvestmentSimulator.png)
 > *Enter investment amount, select deal, and see projected outcome with APY, XLM equivalent, and return intensity bar — all before touching a real wallet.*
 
 ### Marketplace
@@ -138,7 +138,7 @@ The platform operates as a full simulation environment — meaning every flow (u
 > *Browse all open funding opportunities with yield, duration, risk rating, and funding progress.*
 
 ### Deal Detail & Investment Panel
-![Deal Detail](Screenshots/deal-detail.png)
+![Deal Detail](Screenshots/DealDetail.png)
 > *Full deal breakdown: buyer details, cashflow timeline, risk structure, and the Investment Panel to fund the invoice with one click.*
 
 ### Resources & Documentation Center
