@@ -24,8 +24,8 @@
 
 <br/>
 
-[🎬 **Watch Demo**](https://www.loom.com/share/15ca447c73c246ccafb7e6cb7cf675a9) &nbsp;|&nbsp;
-[🔴 **Live App**](https://fintrix-frontend-r4hn.vercel.app/) &nbsp;|&nbsp;
+[🎬 **Watch Demo**](https://www.loom.com/share/037db37052904d3da5d18dc3da95d31e) &nbsp;|&nbsp;
+[🔴 **Live App**](https://fintrix-invoicee.vercel.app/) &nbsp;|&nbsp;
 [⚙️ **CI/CD Pipeline**](https://github.com/vaibhavi-0320/StellerFund/actions) &nbsp;|&nbsp;
 [📋 **User Feedback**](https://docs.google.com/spreadsheets/d/1Z_g-usNOPdgCqJD8ugVWBnagJsbDabLCqWhYH1XF3yA/edit?gid=13758662#gid=13758662) &nbsp;|&nbsp;
 [📝 **Feedback Form**](https://docs.google.com/forms/d/e/1FAIpQLSd0gPeNOEnbcRU0Ld6SxiL9ShnmChXzCGci0pdPFaqKBft8LQ/viewform?usp=header) &nbsp;|&nbsp;
