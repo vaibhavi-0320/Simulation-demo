@@ -15,12 +15,14 @@ export default defineConfig({
     },
   },
   server: {
-    hmr: {
-      protocol: 'ws',
-      host: '127.0.0.1',
-    },
-    port: PORT,
-    host: '127.0.0.1',
+    port: 3001,
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:3000',
+        changeOrigin: true,
+        secure: false
+      }
+    }
   },
   build: {
     outDir: 'dist',
