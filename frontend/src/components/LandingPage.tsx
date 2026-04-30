@@ -1,4 +1,4 @@
-import { Globe } from './Globe';
+import React from 'react';
 
 interface LandingPageProps {
   onLaunch: () => void;
@@ -31,7 +31,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLaunch, loading }) => {
       <section className="relative h-screen min-h-[700px] flex items-center justify-center overflow-hidden bg-black">
         {/* Background */}
         <div className="absolute inset-0 z-0">
-          <Globe />
+          <div className="hero-globe"></div>
           <div className="hero-grid"></div>
         </div>
 

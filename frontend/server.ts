@@ -141,6 +141,13 @@ async function startServer() {
     next();
   });
 
+  // Set extended timeouts for Stellar operations
+  app.use('/api/stellar', (req, res, next) => {
+    req.setTimeout(120000);
+    res.setTimeout(120000);
+    next();
+  });
+
   app.get('/api/stellar/health', async (_req, res) => {
     try {
       const acc = await HORIZON.loadAccount(ESCROW);

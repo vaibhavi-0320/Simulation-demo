@@ -15,13 +15,15 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3001,
+    port: 3002,
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
-        ws: true
+        ws: true,
+        proxyTimeout: 120000,
+        timeout: 120000
       }
     }
   },

@@ -48,6 +48,7 @@ export function configureSecurity(app: Express) {
         "media-src": ["'self'", "https://d8j0ntlcm91z4.cloudfront.net"],
       },
     } : false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
     crossOriginEmbedderPolicy: false,
     frameguard: { action: "deny" },
     hsts: env.NODE_ENV === "production" ? { maxAge: 31_536_000, includeSubDomains: true } : false,
