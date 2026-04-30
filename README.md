@@ -138,7 +138,7 @@ The platform operates as a full simulation environment — meaning every flow (u
 > *Browse all open funding opportunities with yield, duration, risk rating, and funding progress.*
 
 ### Deal Detail & Investment Panel
-![Deal Detail](Screenshots/DealDetail.png)
+![Deal Detail](Screenshots/Deal-Detail.png)
 > *Full deal breakdown: buyer details, cashflow timeline, risk structure, and the Investment Panel to fund the invoice with one click.*
 
 ### Resources & Documentation Center
