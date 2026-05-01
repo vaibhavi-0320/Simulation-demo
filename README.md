@@ -408,7 +408,6 @@ Score weights:
 | 17 | [GCL...QREY](https://stellar.expert/explorer/testnet/account/GCLNJPXUXC5QYY47CPZZUAHKAXSFKKI2X4EUEAMPRDKD6OLRGXQQQREY) | Diya Kamble | ⭐ 4/5 | *"Nice, could be a bit better."* |
 | 18 | [GBI...XE2P](https://stellar.expert/explorer/testnet/account/GBIXQLFE54OK32JKGLK3MLEAJ35IIX6RVHJV4YWALBCWKEYXOWEDXE2P) | Payal Bhaskar | ⭐ 5/5 | *"Very professional and super easy to use."* |
 | 19 | [GBU...5MG](https://stellar.expert/explorer/testnet/account/GBUDUGMHCM7B54DIB5P5LP4PP6MG7MJ6VUBBYDB53BZNZCTH36LLG5MG) | Ayush Gaikwad | ⭐ 5/5 |"Great"
-|
 | 20 | [GAN...HBS](https://stellar.expert/explorer/testnet/account/GANBGUREB5ZAY26ZIAB6VHVQ7CG4KNQMEILZUG2ZWLEPF3DUARLMRHBS) | Pallavi Patil | ⭐ 3/5 | *"The simulation can be improved."* |
 | 21 | [GBT...BDH](https://stellar.expert/explorer/testnet/account/GBTBZDY7OIOYMINOYHHZVHGJOASPL4BQL5U4B6NP3LLHMKDXO6BSYBDH) | Aadesh Khande | ⭐ 5/5 | *"Really impressed with the clean UI and intuitive dashboard."* |
 | 22 | [GCG...YSG7](https://stellar.expert/explorer/testnet/account/GCG4FCF4UB74JJXVWHFXIENK6DKGIXQZ3563RRMK2VH5EU4TBEM7YSG7) | Sumit Borhade | ⭐ 5/5 | *"Good practical understanding of invoice financing concepts."* |
